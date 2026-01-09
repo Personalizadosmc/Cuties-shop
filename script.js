@@ -457,22 +457,124 @@ async function ejecutarAccionConDatos(clienteData) {
   formatPedido(newPedido);
   pedidoActualParaImprimir = newPedido;
 
+  // Obtenemos el turno
   const { count } = await supabaseClient.from('pedidos').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente');
   const turno = count;
 
-  document.getElementById('numeroTurnoExito').innerText = `#${turno}`;
-  modalExitoOrdenInst.show();
+  // Guardamos el turno para mostrarlo después
+  window.turnoActual = turno;
 
-  if (accionPendiente === 'imprimir_descargar') {
-    abrirVentanaImpresion(newPedido, turno);
-  } else if (accionPendiente === 'whatsapp') {
-    enviarPorWhatsApp(newPedido, turno);
-  }
-
+  // Limpiamos carrito siempre
   limpiarCarrito();
   actualizarContadorCarrito();
   invitadoTemp = null;
   accionPendiente = null;
+
+  if (accionPendiente === 'imprimir_descargar') {
+    // Guardamos TODO el contenido original de la página (incluyendo modales, navbar, etc.)
+    const contenidoOriginal = document.body.innerHTML;
+
+    // Creamos el HTML limpio de la factura (sin turno en el título principal)
+    let filasHTML = '';
+    newPedido.items.forEach(i => {
+      filasHTML += `
+        <tr>
+            <td style="padding:10px;"><img src="${i.img}" style="width:50px; border-radius:5px;"></td>
+            <td style="padding:10px;">${i.nombre}</td>
+            <td style="padding:10px; text-align:center;">${i.cantidad}</td>
+            <td style="padding:10px; text-align:right;">${formatearRD(i.precio)}</td>
+            <td style="padding:10px; text-align:right;">${formatearRD(i.precio * i.cantidad)}</td>
+        </tr>`;
+    });
+
+    // Reemplazamos TODO el body con la factura
+    document.body.innerHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Factura #${newPedido.id}</title>
+      <style>
+        body { font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: 40px auto; padding: 20px; background: white; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #6a1b9a; color: white; }
+        img { max-width: 60px; vertical-align: middle; }
+        @media print { 
+          body { margin: 0; padding: 10px; } 
+          * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+      </style>
+    </head>
+    <body>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6a1b9a; padding-bottom:20px; margin-bottom:30px;">
+            <div>
+                <h2 style="margin:0; color:#6a1b9a;">Mariposas Cuties</h2>
+                <div>Salcedo-Tenares</div>
+            </div>
+            <div style="text-align:right;">
+                <h1 style="margin:0; color:#6a1b9a; font-size: 32px;">FACTURA</h1>
+                <p>${newPedido.fecha}</p>
+                <p>ID: ${newPedido.id}</p>
+            </div>
+        </div>
+
+        <div style="background:#f9f9f9; padding:20px; border-radius:10px; margin-bottom:30px;">
+            <strong>Cliente:</strong> ${newPedido.cliente.nombre} ${newPedido.cliente.apellido}<br>
+            <strong>Teléfono:</strong> ${newPedido.cliente.telefono}
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Imagen</th>
+                    <th>Producto</th>
+                    <th>Cant.</th>
+                    <th>Precio</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>${filasHTML}</tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="4" style="text-align:right; font-weight:bold;">Total a Pagar</td>
+                    <td style="font-weight:bold; color:#6a1b9a;">${formatearRD(newPedido.total)}</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <div style="text-align:center; margin-top:50px; font-size:14px; color:#555;">
+            Gracias por preferir Mariposas Cuties.<br>
+            ¡Vuelva pronto!
+        </div>
+
+        <script>
+            window.print();
+        </script>
+    </body>
+    </html>`;
+
+    // Iniciamos la impresión automáticamente
+    window.print();
+
+    // Cuando el usuario termina/cancela la impresión → restauramos y mostramos turno
+    window.onafterprint = function() {
+      // Restauramos el contenido original
+      document.body.innerHTML = contenidoOriginal;
+
+      // Recargamos la página para que todos los eventos y modales vuelvan a funcionar correctamente
+      // (es la forma más segura en este caso)
+      location.reload();
+
+      // Guardamos en localStorage para mostrar el turno justo después del reload
+      localStorage.setItem('mostrarTurnoDespuesDeImpresion', window.turnoActual);
+    };
+
+  } else if (accionPendiente === 'whatsapp') {
+    enviarPorWhatsApp(newPedido, turno);
+    // Para WhatsApp mostramos el turno inmediatamente
+    document.getElementById('numeroTurnoExito').innerText = `#${turno}`;
+    modalExitoOrdenInst.show();
+  }
 }
 
 function enviarPorWhatsApp(pedido, turno) {
@@ -950,4 +1052,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   actualizarInterfaz();
   irASeccion('portada');
 
+  // Verificar si venimos de una impresión y debemos mostrar el turno
+  const turnoPendiente = localStorage.getItem('mostrarTurnoDespuesDeImpresion');
+  if (turnoPendiente) {
+    document.getElementById('numeroTurnoExito').innerText = `#${turnoPendiente}`;
+    modalExitoOrdenInst.show();
+    // Limpiamos para que no vuelva a aparecer en recargas futuras
+    localStorage.removeItem('mostrarTurnoDespuesDeImpresion');
+  }
+  
 });
+
