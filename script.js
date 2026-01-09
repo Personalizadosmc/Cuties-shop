@@ -2,7 +2,7 @@
 const SUPABASE_URL = 'https://yhdaskochzbqktusekbt.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InloZGFza29jaHpicWt0dXNla2J0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc0OTE1MDAsImV4cCI6MjA4MzA2NzUwMH0.kAHQ90Wjy3R_X81e2DZCMtSjJfXp2wlTqnBFBgtJo9M';
 
-const { createClient } = supabase; // Usamos la función global del CDN
+const { createClient } = supabase;
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let categorias = [];
@@ -457,29 +457,27 @@ async function ejecutarAccionConDatos(clienteData) {
   formatPedido(newPedido);
   pedidoActualParaImprimir = newPedido;
 
-  // Obtenemos el turno
   const { count } = await supabaseClient.from('pedidos').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente');
   const turno = count;
 
-  // Guardamos el turno para mostrarlo después
-  window.turnoActual = turno;
+  // Guardamos el turno en localStorage para mostrarlo después de volver de la impresión
+  localStorage.setItem('mostrarTurnoDespuesDeImpresion', turno);
 
-  // Limpiamos carrito siempre
+  // Limpiamos carrito
   limpiarCarrito();
   actualizarContadorCarrito();
   invitadoTemp = null;
   accionPendiente = null;
 
   if (accionPendiente === 'imprimir_descargar') {
-    // Guardamos TODO el contenido original de la página (incluyendo modales, navbar, etc.)
+    // Guardamos el contenido original
     const contenidoOriginal = document.body.innerHTML;
 
-    // Creamos el HTML limpio de la factura (sin turno en el título principal)
     let filasHTML = '';
     newPedido.items.forEach(i => {
       filasHTML += `
         <tr>
-            <td style="padding:10px;"><img src="${i.img}" style="width:50px; border-radius:5px;"></td>
+            <td style="padding:10px;"><img src="${i.img}" style="width:60px; border-radius:5px;"></td>
             <td style="padding:10px;">${i.nombre}</td>
             <td style="padding:10px; text-align:center;">${i.cantidad}</td>
             <td style="padding:10px; text-align:right;">${formatearRD(i.precio)}</td>
@@ -487,7 +485,6 @@ async function ejecutarAccionConDatos(clienteData) {
         </tr>`;
     });
 
-    // Reemplazamos TODO el body con la factura
     document.body.innerHTML = `
     <!DOCTYPE html>
     <html>
@@ -499,9 +496,10 @@ async function ejecutarAccionConDatos(clienteData) {
         th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
         th { background-color: #6a1b9a; color: white; }
         img { max-width: 60px; vertical-align: middle; }
+        .btn-volver { padding: 15px 30px; font-size: 20px; background: #6a1b9a; color: white; border: none; border-radius: 10px; cursor: pointer; margin-top: 50px; }
         @media print { 
-          body { margin: 0; padding: 10px; } 
-          * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .no-print { display: none; } 
+          body { margin: 0; padding: 10px; }
         }
       </style>
     </head>
@@ -542,36 +540,28 @@ async function ejecutarAccionConDatos(clienteData) {
             </tfoot>
         </table>
 
-        <div style="text-align:center; margin-top:50px; font-size:14px; color:#555;">
+        <div style="text-align:center; margin-top:50px;">
             Gracias por preferir Mariposas Cuties.<br>
             ¡Vuelva pronto!
         </div>
 
+        <div class="text-center no-print">
+          <button class="btn-volver" onclick="volverATienda()">He terminado - Volver y ver mi turno</button>
+        </div>
+
         <script>
             window.print();
+            window.onafterprint = function() { volverATienda(); };
+
+            function volverATienda() {
+              location.reload();
+            }
         </script>
     </body>
     </html>`;
 
-    // Iniciamos la impresión automáticamente
-    window.print();
-
-    // Cuando el usuario termina/cancela la impresión → restauramos y mostramos turno
-    window.onafterprint = function() {
-      // Restauramos el contenido original
-      document.body.innerHTML = contenidoOriginal;
-
-      // Recargamos la página para que todos los eventos y modales vuelvan a funcionar correctamente
-      // (es la forma más segura en este caso)
-      location.reload();
-
-      // Guardamos en localStorage para mostrar el turno justo después del reload
-      localStorage.setItem('mostrarTurnoDespuesDeImpresion', window.turnoActual);
-    };
-
   } else if (accionPendiente === 'whatsapp') {
     enviarPorWhatsApp(newPedido, turno);
-    // Para WhatsApp mostramos el turno inmediatamente
     document.getElementById('numeroTurnoExito').innerText = `#${turno}`;
     modalExitoOrdenInst.show();
   }
@@ -585,107 +575,6 @@ function enviarPorWhatsApp(pedido, turno) {
   mensaje += `\nTotal: ${formatearRD(pedido.total)}`;
   const url = `https://wa.me/18096659100?text=${encodeURIComponent(mensaje)}`;
   window.open(url, '_blank');
-}
-
-function abrirVentanaImpresion(pedido, turno) {
-  // Guardamos el contenido original de la página
-  const contenidoOriginal = document.body.innerHTML;
-
-  // Generamos el HTML de la factura (el mismo que tenías)
-  let filasHTML = '';
-  pedido.items.forEach(i => {
-    filasHTML += `
-      <tr>
-          <td style="padding:10px;"><img src="${i.img}" style="width:50px; border-radius:5px;"></td>
-          <td style="padding:10px;">${i.nombre}</td>
-          <td style="padding:10px; text-align:center;">${i.cantidad}</td>
-          <td style="padding:10px; text-align:right;">${formatearRD(i.precio)}</td>
-          <td style="padding:10px; text-align:right;">${formatearRD(i.precio * i.cantidad)}</td>
-      </tr>`;
-  });
-
-  const htmlFactura = `
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <title>Factura #${pedido.id}</title>
-    <style>
-      body { font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: 40px auto; padding: 20px; }
-      table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-      th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-      th { background-color: #6a1b9a; color: white; }
-      img { max-width: 60px; }
-      @media print {
-        body { margin: 0; padding: 10px; }
-        button { display: none; }
-      }
-    </style>
-  </head>
-  <body>
-      <!-- Todo el mismo HTML de tu factura -->
-      <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #6a1b9a; padding-bottom:20px; margin-bottom:30px;">
-          <div>
-              <h2 style="margin:0; color:#6a1b9a;">Mariposas Cuties</h2>
-              <div>Salcedo-Tenares</div>
-          </div>
-          <div style="text-align:right;">
-              <h1 style="margin:0; color:#6a1b9a; font-size: 32px;">FACTURA</h1>
-              <p>${pedido.fecha}</p>
-              <p>ID: ${pedido.id}</p>
-              <p>Turno: #${turno}</p>
-          </div>
-      </div>
-
-      <div style="background:#f9f9f9; padding:20px; border-radius:10px; margin-bottom:30px;">
-          <strong>Cliente:</strong> ${pedido.cliente.nombre} ${pedido.cliente.apellido}<br>
-          <strong>Teléfono:</strong> ${pedido.cliente.telefono}
-      </div>
-
-      <table>
-          <thead>
-              <tr>
-                  <th>Imagen</th>
-                  <th>Producto</th>
-                  <th>Cant.</th>
-                  <th>Precio</th>
-                  <th>Total</th>
-              </tr>
-          </thead>
-          <tbody>${filasHTML}</tbody>
-          <tfoot>
-              <tr>
-                  <td colspan="4" style="text-align:right; font-weight:bold;">Total a Pagar</td>
-                  <td style="font-weight:bold; color:#6a1b9a;">${formatearRD(pedido.total)}</td>
-              </tr>
-          </tfoot>
-      </table>
-
-      <div style="text-align:center; margin-top:50px;">
-          Gracias por preferir Mariposas Cuties.<br>
-          ¡Vuelva pronto!
-      </div>
-
-      <script>
-          // Imprime automáticamente al cargar
-          window.print();
-          // Opcional: después de imprimir, vuelve a la página original
-          // window.onafterprint = function() { window.history.back(); };
-      </script>
-  </body>
-  </html>`;
-
-  // Reemplazamos el contenido de la página actual con la factura
-  document.body.innerHTML = htmlFactura;
-
-  // Forzamos la impresión
-  window.print();
-
-  // Opcional: después de imprimir, restauramos la página original
-  window.onafterprint = function() {
-    document.body.innerHTML = contenidoOriginal;
-    // Recargamos las funciones y eventos si es necesario
-    location.reload(); // o mejor, guardar estado antes
-  };
 }
 
 // ================= ADMIN LOGIC =================
@@ -1037,29 +926,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   modalDetallePedidoInst = new bootstrap.Modal(document.getElementById('modalDetallePedido'));
   modalConfirmacionInst = new bootstrap.Modal(document.getElementById('modalConfirmacion'));
   modalExitoOrdenInst = new bootstrap.Modal(document.getElementById('modalExitoOrden'));
-  
+
   if (usuarioActual) {
-    const { data, error } = await supabaseClient.from('usuarios').select('*').eq('username', usuarioActual).single();
-    if (data) {
-      currentUser = data;
-    } else {
+    const { data } = await supabaseClient.from('usuarios').select('*').eq('username', usuarioActual).single();
+    if (data) currentUser = data;
+    else {
       localStorage.removeItem('usuarioActual');
       usuarioActual = null;
     }
   }
-  
+
   await cargarCategoriaMenu();
   actualizarInterfaz();
   irASeccion('portada');
 
-  // Verificar si venimos de una impresión y debemos mostrar el turno
+  // === NUEVO: Mostrar turno si venimos de impresión ===
   const turnoPendiente = localStorage.getItem('mostrarTurnoDespuesDeImpresion');
   if (turnoPendiente) {
     document.getElementById('numeroTurnoExito').innerText = `#${turnoPendiente}`;
     modalExitoOrdenInst.show();
-    // Limpiamos para que no vuelva a aparecer en recargas futuras
     localStorage.removeItem('mostrarTurnoDespuesDeImpresion');
   }
-  
 });
-
