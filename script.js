@@ -2,7 +2,7 @@
 const SUPABASE_URL = 'https://yhdaskochzbqktusekbt.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InloZGFza29jaHpicWt0dXNla2J0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc0OTE1MDAsImV4cCI6MjA4MzA2NzUwMH0.kAHQ90Wjy3R_X81e2DZCMtSjJfXp2wlTqnBFBgtJo9M';
 
-const { createClient } = supabase;
+const { createClient } = supabase; // Usamos la función global del CDN
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let categorias = [];
@@ -14,7 +14,7 @@ let invitadoTemp = null;
 let accionPendiente = null; 
 let pedidoActualParaImprimir = null; 
 
-let toastBootstrap, modalCategoriaInst, modalProductoInst, modalDatosInvitadoInst, modalDetallePedidoInst, modalConfirmacionInst, modalExitoOrdenInst;
+let toastBootstrap, modalCategoriaInst, modalProductoInst, modalDatosInvitadoInst, modalDetallePedidoInst, modalConfirmacionInst, modalExitoOrdenInst, modalDetalleInst;
 
 function formatearRD(monto) {
   return 'RD$ ' + monto.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -58,19 +58,13 @@ function limpiarCarrito() {
 }
 
 function mostrarToast(mensaje) {
-  const toastBody = document.getElementById('toastBody');
-  if(toastBody) {
-      toastBody.innerText = mensaje;
-      toastBootstrap.show();
-  } else {
-      alert(mensaje);
-  }
+  document.getElementById('toastBody').innerText = mensaje;
+  toastBootstrap.show();
 }
 
 async function irASeccion(seccion) {
   document.querySelectorAll('.seccion').forEach(s => s.classList.remove('active'));
-  const target = document.getElementById(seccion);
-  if(target) target.classList.add('active');
+  document.getElementById(seccion).classList.add('active');
 
   if (seccion === 'portada') { 
     await cargarCategorias(); 
@@ -118,11 +112,9 @@ function actualizarContadorCarrito() {
   const carrito = getCarrito();
   const total = carrito.reduce((sum, item) => sum + item.cantidad, 0);
   const badge = document.getElementById('cartCount');
-  if(badge) {
-      badge.innerText = total;
-      if(total > 0) badge.classList.remove('d-none');
-      else badge.classList.add('d-none');
-  }
+  badge.innerText = total;
+  if(total > 0) badge.classList.remove('d-none');
+  else badge.classList.add('d-none');
 }
 
 // ================= AUTH =================
@@ -188,7 +180,6 @@ function cerrarSesion() {
 async function cargarCategorias() {
   categorias = await loadCategories();
   const container = document.getElementById('listaCategorias');
-  if(!container) return;
   container.innerHTML = '';
   categorias.forEach(cat => {
     container.innerHTML += `
@@ -206,7 +197,6 @@ async function cargarCategorias() {
 
 async function cargarCategoriaMenu() {
   const menu = document.getElementById('categoriaMenu');
-  if(!menu) return;
   menu.innerHTML = '';
   categorias.forEach(cat => {
     menu.innerHTML += `
@@ -354,12 +344,10 @@ function agregarAlCarrito(producto) {
 function cargarCarrito() {
   const carrito = getCarrito();
   const container = document.getElementById('listaCarrito'); 
-  if(!container) return;
   container.innerHTML = '';
-  
   if (carrito.length === 0) {
     container.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-5">Tu carrito está vacío</td></tr>';
-    document.getElementById('totalCarrito').innerText = 'RD$ 0.00';
+    document.getElementById('totalCarrito').innerText = 'RD$0.00';
     return;
   }
   let total = 0;
@@ -448,12 +436,9 @@ async function confirmarDatosInvitado() {
   await ejecutarAccionConDatos(invitadoTemp);
 }
 
-// CORRECCIÓN IMPORTANTE AQUÍ
 async function ejecutarAccionConDatos(clienteData) {
   const carrito = getCarrito();
   const total = carrito.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
-  
-  // 1. Guardar en Base de Datos
   const pedido = {
     cliente: { nombre: clienteData.nombre, apellido: clienteData.apellido, telefono: clienteData.telefono },
     items: carrito,
@@ -472,135 +457,21 @@ async function ejecutarAccionConDatos(clienteData) {
   formatPedido(newPedido);
   pedidoActualParaImprimir = newPedido;
 
-  // 2. Obtener Turno
   const { count } = await supabaseClient.from('pedidos').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente');
   const turno = count;
 
-  // 3. LIMPIEZA INMEDIATA DE DATOS Y VISTA
-  // Esto asegura que el carrito se vea vacío AHORA MISMO
-  limpiarCarrito();
-  actualizarContadorCarrito();
-  cargarCarrito(); // <-- Actualiza la tabla HTML para que se vea vacía
-  invitadoTemp = null;
-  
-  // Guardamos el turno para mostrarlo DESPUÉS de imprimir/recargar
-  localStorage.setItem('mostrarTurnoDespuesDeImpresion', turno);
+  document.getElementById('numeroTurnoExito').innerText = `#${turno}`;
+  modalExitoOrdenInst.show();
 
   if (accionPendiente === 'imprimir_descargar') {
-    // Generar HTML de Impresión
-    let filasHTML = '';
-    newPedido.items.forEach(i => {
-      filasHTML += `
-        <tr>
-            <td style="padding:10px;"><img src="${i.img}" style="width:60px; border-radius:5px;"></td>
-            <td style="padding:10px;">${i.nombre}</td>
-            <td style="padding:10px; text-align:center;">${i.cantidad}</td>
-            <td style="padding:10px; text-align:right;">${formatearRD(i.precio)}</td>
-            <td style="padding:10px; text-align:right;">${formatearRD(i.precio * i.cantidad)}</td>
-        </tr>`;
-    });
-
-    // Reemplazamos el body para imprimir
-    document.body.innerHTML = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Factura #${newPedido.id}</title>
-      <style>
-        body { font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: 40px auto; padding: 20px; background: white; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background-color: #6a1b9a; color: white; }
-        img { max-width: 60px; vertical-align: middle; }
-        .btn-volver { 
-            padding: 15px 30px; 
-            font-size: 20px; 
-            background: #6a1b9a; 
-            color: white; 
-            border: none; 
-            border-radius: 10px; 
-            cursor: pointer; 
-            margin-top: 50px; 
-            display: inline-block;
-            text-decoration: none;
-        }
-        @media print { 
-          .no-print { display: none; } 
-          body { margin: 0; padding: 10px; }
-        }
-      </style>
-    </head>
-    <body>
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6a1b9a; padding-bottom:20px; margin-bottom:30px;">
-            <div>
-                <h2 style="margin:0; color:#6a1b9a;">Mariposas Cuties</h2>
-                <div>Salcedo-Tenares</div>
-            </div>
-            <div style="text-align:right;">
-                <h1 style="margin:0; color:#6a1b9a; font-size: 32px;">FACTURA</h1>
-                <p>${newPedido.fecha}</p>
-                <p>ID: ${newPedido.id}</p>
-            </div>
-        </div>
-
-        <div style="background:#f9f9f9; padding:20px; border-radius:10px; margin-bottom:30px;">
-            <strong>Cliente:</strong> ${newPedido.cliente.nombre} ${newPedido.cliente.apellido}<br>
-            <strong>Teléfono:</strong> ${newPedido.cliente.telefono}
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Imagen</th>
-                    <th>Producto</th>
-                    <th>Cant.</th>
-                    <th>Precio</th>
-                    <th>Total</th>
-                </tr>
-            </thead>
-            <tbody>${filasHTML}</tbody>
-            <tfoot>
-                <tr>
-                    <td colspan="4" style="text-align:right; font-weight:bold;">Total a Pagar</td>
-                    <td style="font-weight:bold; color:#6a1b9a;">${formatearRD(newPedido.total)}</td>
-                </tr>
-            </tfoot>
-        </table>
-
-        <div style="text-align:center; margin-top:50px;">
-            Gracias por preferir Mariposas Cuties.<br>
-            ¡Vuelva pronto!
-        </div>
-
-        <div class="text-center no-print" style="text-align:center;">
-          <button class="btn-volver" onclick="volverATienda()">Volver a la Tienda y Ver Turno</button>
-        </div>
-
-        <script>
-            // Retraso para asegurar carga del DOM antes de imprimir
-            setTimeout(function() {
-                window.print();
-            }, 800);
-
-            // Intentar volver automáticamente después de imprimir
-            window.onafterprint = function() { volverATienda(); };
-
-            function volverATienda() {
-              window.location.reload();
-            }
-        </script>
-    </body>
-    </html>`;
-
+    abrirVentanaImpresion(newPedido, turno);
   } else if (accionPendiente === 'whatsapp') {
-    // Si es WhatsApp, no recargamos, mostramos modal directo
     enviarPorWhatsApp(newPedido, turno);
-    document.getElementById('numeroTurnoExito').innerText = `#${turno}`;
-    modalExitoOrdenInst.show();
-    // Limpiamos el localStorage del turno para que no salte de nuevo si recarga manualmente
-    localStorage.removeItem('mostrarTurnoDespuesDeImpresion');
   }
-  
+
+  limpiarCarrito();
+  actualizarContadorCarrito();
+  invitadoTemp = null;
   accionPendiente = null;
 }
 
@@ -614,17 +485,102 @@ function enviarPorWhatsApp(pedido, turno) {
   window.open(url, '_blank');
 }
 
+function abrirVentanaImpresion(pedido, turno) {
+  let filasHTML = '';
+  pedido.items.forEach(i => {
+    filasHTML += `
+      <tr>
+          <td style="padding:10px;"><img src="${i.img}" style="width:50px; border-radius:5px;"></td>
+          <td style="padding:10px;">${i.nombre}</td>
+          <td style="padding:10px; text-align:center;">${i.cantidad}</td>
+          <td style="padding:10px; text-align:right;">${formatearRD(i.precio)}</td>
+          <td style="padding:10px; text-align:right;">${formatearRD(i.precio * i.cantidad)}</td>
+      </tr>`;
+  });
+
+  const ventana = window.open('', '_blank');
+  ventana.document.write(`
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <title>Factura #${pedido.id}</title>
+    <style>
+      body { font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border-bottom: 1px solid #eee; }
+    </style>
+  </head>
+  <body>
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6a1b9a; padding-bottom:20px; margin-bottom:30px;">
+          <div style="text-align: left;">
+              <img src="Logo.png" style="height:80px; display:block; margin-bottom:10px;" alt="Logo">
+              <h2 style="margin:0; color:#6a1b9a; line-height:1;">Mariposas Cuties</h2>
+              <div style="font-size:12px; margin-top:5px;">Salcedo-Tenares</div>
+          </div>
+          <div style="text-align:right;">
+              <h1 style="margin:0; color:#6a1b9a; font-size: 32px; letter-spacing: 2px;">FACTURA</h1>
+              <p style="font-size:14px; margin:5px 0 0 0; font-weight:bold; color:#555;">${pedido.fecha}</p>
+              <p style="font-size:12px; margin:2px 0 0 0; color:#888;">ID: ${pedido.id}</p>
+          </div>
+      </div>
+      
+      <div style="background:#f9f9f9; padding:20px; border-radius:10px; margin-bottom:30px;">
+          <table style="width:100%;">
+              <tr>
+                  <td>
+                      <div style="font-size:11px; text-transform:uppercase; color:#999; margin-bottom:5px;">Facturar a:</div>
+                      <div style="font-size:16px; font-weight:bold;">${pedido.cliente.nombre} ${pedido.cliente.apellido}</div>
+                      <div>${pedido.cliente.telefono}</div>
+                  </td>
+                  <td style="text-align:right; vertical-align:bottom;">
+                       <div style="font-size:14px;">Estado: <b>${pedido.estado.toUpperCase()}</b></div>
+                  </td>
+              </tr>
+          </table>
+      </div>
+
+      <table style="width:100%; border-collapse:collapse; margin-bottom:30px;">
+          <thead style="background:#6a1b9a; color:white;">
+              <tr>
+                  <th style="padding:12px;">Imagen</th>
+                  <th style="padding:12px; text-align:left;">Producto</th>
+                  <th style="padding:12px;">Cant.</th>
+                  <th style="padding:12px; text-align:right;">Precio</th>
+                  <th style="padding:12px; text-align:right;">Total</th>
+              </tr>
+          </thead>
+          <tbody>${filasHTML}</tbody>
+      </table>
+
+      <div style="text-align:right; margin-top:20px;">
+          <div style="display:inline-block; text-align:right; border-top: 1px solid #ccc; padding-top:10px;">
+              <div style="font-size:18px; margin-bottom:5px;">Total a Pagar</div>
+              <div style="font-size:28px; font-weight:bold; color:#6a1b9a;">${formatearRD(pedido.total)}</div>
+          </div>
+      </div>
+      
+      <div style="margin-top:50px; text-align:center; font-size:12px; color:#999; border-top:1px dashed #ddd; padding-top:20px;">
+          Gracias por preferir Mariposas Cuties.<br>
+          ¡Vuelva pronto!
+      </div>
+
+      <script>
+          window.onload = function() { window.print(); }
+      </script>
+  </body>
+  </html>`);
+  ventana.document.close();
+}
+
 // ================= ADMIN LOGIC =================
 async function actualizarBadgeColaAdmin() {
   const { count } = await supabaseClient.from('pedidos').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente');
-  const el = document.getElementById('badgeColaAdmin');
-  if(el) el.innerText = count || 0;
+  document.getElementById('badgeColaAdmin').innerText = count || 0;
 }
 
 async function cargarCategoriasAdmin() {
   categorias = await loadCategories();
   const container = document.getElementById('listaCategoriasAdmin'); 
-  if(!container) return;
   container.innerHTML = '';
   categorias.forEach((cat) => {
     container.innerHTML += `
@@ -642,7 +598,6 @@ async function cargarCategoriasAdmin() {
 async function cargarProductosAdmin() {
   categorias = await loadCategories();
   const container = document.getElementById('listaProductosAdmin'); 
-  if(!container) return;
   container.innerHTML = '';
   categorias.forEach((cat) => {
     cat.productos.forEach((prod) => {
@@ -669,9 +624,6 @@ async function cargarPedidosAdmin() {
   historialPedidos = await loadPedidos();
   const containerPendientes = document.getElementById('listaPedidosPendientes'); 
   const containerCompletados = document.getElementById('listaPedidosCompletados'); 
-  
-  if(!containerPendientes || !containerCompletados) return;
-  
   containerPendientes.innerHTML = ''; 
   containerCompletados.innerHTML = '';
 
@@ -775,52 +727,11 @@ function calcularTurnoActualDePedido(id) {
 
 function reimprimirPedidoDesdeModal() { 
     if(pedidoActualParaImprimir) {
-        // En este caso, como no vamos a borrar el carrito (es admin viendo historial),
-        // no necesitamos lógica de limpieza compleja, solo imprimir.
-        abrirVentanaImpresion(pedidoActualParaImprimir); 
+        let turno = (pedidoActualParaImprimir.estado === 'pendiente') 
+            ? calcularTurnoActualDePedido(pedidoActualParaImprimir.id) 
+            : "-";
+        abrirVentanaImpresion(pedidoActualParaImprimir, turno); 
     }
-}
-
-function abrirVentanaImpresion(pedido) {
-    // Función auxiliar para imprimir desde el admin (sin vaciar carrito actual ni recargar agresivamente)
-    const ventana = window.open('', '_blank');
-    let filasHTML = '';
-    pedido.items.forEach(i => {
-      filasHTML += `
-        <tr>
-            <td style="padding:10px;"><img src="${i.img}" style="width:60px; border-radius:5px;"></td>
-            <td style="padding:10px;">${i.nombre}</td>
-            <td style="padding:10px; text-align:center;">${i.cantidad}</td>
-            <td style="padding:10px; text-align:right;">${formatearRD(i.precio)}</td>
-            <td style="padding:10px; text-align:right;">${formatearRD(i.precio * i.cantidad)}</td>
-        </tr>`;
-    });
-    
-    ventana.document.write(`
-    <html>
-    <head>
-      <title>Reimpresión #${pedido.id}</title>
-      <style>
-        body { font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: 40px auto; padding: 20px; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th, td { border: 1px solid #ddd; padding: 12px; }
-        th { background-color: #6a1b9a; color: white; }
-        img { max-width: 60px; }
-      </style>
-    </head>
-    <body>
-        <h2>Reimpresión - Mariposas Cuties</h2>
-        <p>ID: ${pedido.id} - ${pedido.fecha}</p>
-        <p>Cliente: ${pedido.cliente.nombre}</p>
-        <table>
-            <thead><tr><th>Imagen</th><th>Producto</th><th>Cant.</th><th>Precio</th><th>Total</th></tr></thead>
-            <tbody>${filasHTML}</tbody>
-            <tfoot><tr><td colspan="4" style="text-align:right;">Total</td><td>${formatearRD(pedido.total)}</td></tr></tfoot>
-        </table>
-        <script>window.print(); window.onafterprint = function(){ window.close(); }</script>
-    </body>
-    </html>`);
-    ventana.document.close();
 }
 
 async function borrarHistorialCompleto() {
@@ -1010,30 +921,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   modalDetallePedidoInst = new bootstrap.Modal(document.getElementById('modalDetallePedido'));
   modalConfirmacionInst = new bootstrap.Modal(document.getElementById('modalConfirmacion'));
   modalExitoOrdenInst = new bootstrap.Modal(document.getElementById('modalExitoOrden'));
-
+  
   if (usuarioActual) {
-    const { data } = await supabaseClient.from('usuarios').select('*').eq('username', usuarioActual).single();
-    if (data) currentUser = data;
-    else {
+    const { data, error } = await supabaseClient.from('usuarios').select('*').eq('username', usuarioActual).single();
+    if (data) {
+      currentUser = data;
+    } else {
       localStorage.removeItem('usuarioActual');
       usuarioActual = null;
     }
   }
-
+  
   await cargarCategoriaMenu();
   actualizarInterfaz();
-  
-  // VERIFICAR SI HAY UN TURNO PENDIENTE DE MOSTRAR (Viene de recargar tras imprimir)
-  const turnoPendiente = localStorage.getItem('mostrarTurnoDespuesDeImpresion');
-  if (turnoPendiente) {
-    // Primero vamos a portada para tener contexto base
-    irASeccion('portada');
-    // Luego mostramos el modal del turno
-    document.getElementById('numeroTurnoExito').innerText = `#${turnoPendiente}`;
-    modalExitoOrdenInst.show();
-    // Limpiamos el flag para que no salga siempre
-    localStorage.removeItem('mostrarTurnoDespuesDeImpresion');
-  } else {
-    irASeccion('portada');
-  }
+  irASeccion('portada');
 });
