@@ -486,6 +486,10 @@ function enviarPorWhatsApp(pedido, turno) {
 }
 
 function abrirVentanaImpresion(pedido, turno) {
+  // Guardamos el contenido original de la página
+  const contenidoOriginal = document.body.innerHTML;
+
+  // Generamos el HTML de la factura (el mismo que tenías)
   let filasHTML = '';
   pedido.items.forEach(i => {
     filasHTML += `
@@ -498,78 +502,88 @@ function abrirVentanaImpresion(pedido, turno) {
       </tr>`;
   });
 
-  const ventana = window.open('', '_blank');
-  ventana.document.write(`
+  const htmlFactura = `
   <!DOCTYPE html>
   <html>
   <head>
     <title>Factura #${pedido.id}</title>
     <style>
-      body { font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
-      table { width: 100%; border-collapse: collapse; }
-      th, td { border-bottom: 1px solid #eee; }
+      body { font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: 40px auto; padding: 20px; }
+      table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+      th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+      th { background-color: #6a1b9a; color: white; }
+      img { max-width: 60px; }
+      @media print {
+        body { margin: 0; padding: 10px; }
+        button { display: none; }
+      }
     </style>
   </head>
   <body>
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6a1b9a; padding-bottom:20px; margin-bottom:30px;">
-          <div style="text-align: left;">
-              <img src="Logo.png" style="height:80px; display:block; margin-bottom:10px;" alt="Logo">
-              <h2 style="margin:0; color:#6a1b9a; line-height:1;">Mariposas Cuties</h2>
-              <div style="font-size:12px; margin-top:5px;">Salcedo-Tenares</div>
+      <!-- Todo el mismo HTML de tu factura -->
+      <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #6a1b9a; padding-bottom:20px; margin-bottom:30px;">
+          <div>
+              <h2 style="margin:0; color:#6a1b9a;">Mariposas Cuties</h2>
+              <div>Salcedo-Tenares</div>
           </div>
           <div style="text-align:right;">
-              <h1 style="margin:0; color:#6a1b9a; font-size: 32px; letter-spacing: 2px;">FACTURA</h1>
-              <p style="font-size:14px; margin:5px 0 0 0; font-weight:bold; color:#555;">${pedido.fecha}</p>
-              <p style="font-size:12px; margin:2px 0 0 0; color:#888;">ID: ${pedido.id}</p>
+              <h1 style="margin:0; color:#6a1b9a; font-size: 32px;">FACTURA</h1>
+              <p>${pedido.fecha}</p>
+              <p>ID: ${pedido.id}</p>
+              <p>Turno: #${turno}</p>
           </div>
       </div>
-      
+
       <div style="background:#f9f9f9; padding:20px; border-radius:10px; margin-bottom:30px;">
-          <table style="width:100%;">
-              <tr>
-                  <td>
-                      <div style="font-size:11px; text-transform:uppercase; color:#999; margin-bottom:5px;">Facturar a:</div>
-                      <div style="font-size:16px; font-weight:bold;">${pedido.cliente.nombre} ${pedido.cliente.apellido}</div>
-                      <div>${pedido.cliente.telefono}</div>
-                  </td>
-                  <td style="text-align:right; vertical-align:bottom;">
-                       <div style="font-size:14px;">Estado: <b>${pedido.estado.toUpperCase()}</b></div>
-                  </td>
-              </tr>
-          </table>
+          <strong>Cliente:</strong> ${pedido.cliente.nombre} ${pedido.cliente.apellido}<br>
+          <strong>Teléfono:</strong> ${pedido.cliente.telefono}
       </div>
 
-      <table style="width:100%; border-collapse:collapse; margin-bottom:30px;">
-          <thead style="background:#6a1b9a; color:white;">
+      <table>
+          <thead>
               <tr>
-                  <th style="padding:12px;">Imagen</th>
-                  <th style="padding:12px; text-align:left;">Producto</th>
-                  <th style="padding:12px;">Cant.</th>
-                  <th style="padding:12px; text-align:right;">Precio</th>
-                  <th style="padding:12px; text-align:right;">Total</th>
+                  <th>Imagen</th>
+                  <th>Producto</th>
+                  <th>Cant.</th>
+                  <th>Precio</th>
+                  <th>Total</th>
               </tr>
           </thead>
           <tbody>${filasHTML}</tbody>
+          <tfoot>
+              <tr>
+                  <td colspan="4" style="text-align:right; font-weight:bold;">Total a Pagar</td>
+                  <td style="font-weight:bold; color:#6a1b9a;">${formatearRD(pedido.total)}</td>
+              </tr>
+          </tfoot>
       </table>
 
-      <div style="text-align:right; margin-top:20px;">
-          <div style="display:inline-block; text-align:right; border-top: 1px solid #ccc; padding-top:10px;">
-              <div style="font-size:18px; margin-bottom:5px;">Total a Pagar</div>
-              <div style="font-size:28px; font-weight:bold; color:#6a1b9a;">${formatearRD(pedido.total)}</div>
-          </div>
-      </div>
-      
-      <div style="margin-top:50px; text-align:center; font-size:12px; color:#999; border-top:1px dashed #ddd; padding-top:20px;">
+      <div style="text-align:center; margin-top:50px;">
           Gracias por preferir Mariposas Cuties.<br>
           ¡Vuelva pronto!
       </div>
 
       <script>
-          window.onload = function() { window.print(); }
+          // Imprime automáticamente al cargar
+          window.print();
+          // Opcional: después de imprimir, vuelve a la página original
+          // window.onafterprint = function() { window.history.back(); };
       </script>
   </body>
-  </html>`);
-  ventana.document.close();
+  </html>`;
+
+  // Reemplazamos el contenido de la página actual con la factura
+  document.body.innerHTML = htmlFactura;
+
+  // Forzamos la impresión
+  window.print();
+
+  // Opcional: después de imprimir, restauramos la página original
+  window.onafterprint = function() {
+    document.body.innerHTML = contenidoOriginal;
+    // Recargamos las funciones y eventos si es necesario
+    location.reload(); // o mejor, guardar estado antes
+  };
 }
 
 // ================= ADMIN LOGIC =================
@@ -935,4 +949,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   await cargarCategoriaMenu();
   actualizarInterfaz();
   irASeccion('portada');
+
 });
