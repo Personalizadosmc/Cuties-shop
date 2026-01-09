@@ -485,6 +485,7 @@ function enviarPorWhatsApp(pedido, turno) {
   window.open(url, '_blank');
 }
 
+// ================= MODIFICADO: FUNCIÓN DE IMPRESIÓN =================
 function abrirVentanaImpresion(pedido, turno) {
   let filasHTML = '';
   pedido.items.forEach(i => {
@@ -499,26 +500,49 @@ function abrirVentanaImpresion(pedido, turno) {
   });
 
   const ventana = window.open('', '_blank');
+  
+  if(!ventana) {
+    return mostrarToast('⚠️ Permite las ventanas emergentes para imprimir.');
+  }
+
   ventana.document.write(`
   <!DOCTYPE html>
   <html>
   <head>
     <title>Factura #${pedido.id}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-      body { font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+      body { font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; font-size: 14px; }
       table { width: 100%; border-collapse: collapse; }
       th, td { border-bottom: 1px solid #eee; }
+      @media print {
+        .no-print { display: none !important; }
+      }
+      .btn-cerrar {
+        display: block; 
+        width: 100%; 
+        padding: 15px; 
+        background: #eee; 
+        text-align: center; 
+        text-decoration: none; 
+        color: #333; 
+        border-radius: 8px; 
+        margin-bottom: 20px;
+        font-weight: bold;
+      }
     </style>
   </head>
   <body>
+      <a href="#" onclick="window.close()" class="no-print btn-cerrar">Cerrar Ventana</a>
+
       <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6a1b9a; padding-bottom:20px; margin-bottom:30px;">
           <div style="text-align: left;">
-              <img src="Logo.png" style="height:80px; display:block; margin-bottom:10px;" alt="Logo">
+              <img src="Logo.png" style="height:60px; display:block; margin-bottom:10px;" alt="Logo" onerror="this.style.display='none'">
               <h2 style="margin:0; color:#6a1b9a; line-height:1;">Mariposas Cuties</h2>
               <div style="font-size:12px; margin-top:5px;">Salcedo-Tenares</div>
           </div>
           <div style="text-align:right;">
-              <h1 style="margin:0; color:#6a1b9a; font-size: 32px; letter-spacing: 2px;">FACTURA</h1>
+              <h1 style="margin:0; color:#6a1b9a; font-size: 24px; letter-spacing: 2px;">FACTURA</h1>
               <p style="font-size:14px; margin:5px 0 0 0; font-weight:bold; color:#555;">${pedido.fecha}</p>
               <p style="font-size:12px; margin:2px 0 0 0; color:#888;">ID: ${pedido.id}</p>
           </div>
@@ -539,23 +563,25 @@ function abrirVentanaImpresion(pedido, turno) {
           </table>
       </div>
 
-      <table style="width:100%; border-collapse:collapse; margin-bottom:30px;">
-          <thead style="background:#6a1b9a; color:white;">
-              <tr>
-                  <th style="padding:12px;">Imagen</th>
-                  <th style="padding:12px; text-align:left;">Producto</th>
-                  <th style="padding:12px;">Cant.</th>
-                  <th style="padding:12px; text-align:right;">Precio</th>
-                  <th style="padding:12px; text-align:right;">Total</th>
-              </tr>
-          </thead>
-          <tbody>${filasHTML}</tbody>
-      </table>
+      <div style="overflow-x: auto;">
+          <table style="width:100%; border-collapse:collapse; margin-bottom:30px;">
+              <thead style="background:#6a1b9a; color:white;">
+                  <tr>
+                      <th style="padding:10px;">Img</th>
+                      <th style="padding:10px; text-align:left;">Producto</th>
+                      <th style="padding:10px;">Cant.</th>
+                      <th style="padding:10px; text-align:right;">Precio</th>
+                      <th style="padding:10px; text-align:right;">Total</th>
+                  </tr>
+              </thead>
+              <tbody>${filasHTML}</tbody>
+          </table>
+      </div>
 
       <div style="text-align:right; margin-top:20px;">
           <div style="display:inline-block; text-align:right; border-top: 1px solid #ccc; padding-top:10px;">
               <div style="font-size:18px; margin-bottom:5px;">Total a Pagar</div>
-              <div style="font-size:28px; font-weight:bold; color:#6a1b9a;">${formatearRD(pedido.total)}</div>
+              <div style="font-size:24px; font-weight:bold; color:#6a1b9a;">${formatearRD(pedido.total)}</div>
           </div>
       </div>
       
@@ -565,12 +591,35 @@ function abrirVentanaImpresion(pedido, turno) {
       </div>
 
       <script>
-          window.onload = function() { window.print(); }
+          window.onload = function() {
+              // Pequeño retraso para que carguen imágenes en móvil
+              setTimeout(function(){
+                  window.focus();
+                  window.print();
+              }, 500);
+          }
+
+          // Intentar cerrar automáticamente después de imprimir (funciona en Chrome/Android)
+          window.onafterprint = function() {
+              window.close();
+          };
+
+          // Soporte adicional para cerrar al detectar cambio de estado de impresión (Safari/iOS)
+          if (window.matchMedia) {
+              var mediaQueryList = window.matchMedia('print');
+              mediaQueryList.addListener(function(mql) {
+                  if (!mql.matches) {
+                      window.close();
+                  }
+              });
+          }
       </script>
   </body>
   </html>`);
   ventana.document.close();
 }
+// ================= FIN MODIFICACION =================
+
 
 // ================= ADMIN LOGIC =================
 async function actualizarBadgeColaAdmin() {
