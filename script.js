@@ -13,6 +13,7 @@ let usuarioActual = localStorage.getItem('usuarioActual') || null;
 let invitadoTemp = null; 
 let accionPendiente = null; 
 let pedidoActualParaImprimir = null; 
+let printWindow = null;  // Ventana de impresión global para manejar mejor en móvil
 
 let toastBootstrap, modalCategoriaInst, modalProductoInst, modalDatosInvitadoInst, modalDetallePedidoInst, modalConfirmacionInst, modalExitoOrdenInst, modalDetalleInst;
 
@@ -398,7 +399,7 @@ function vaciarCarrito() {
   actualizarContadorCarrito(); 
 }
 
-// ================= ORDENES Y COLA - CORREGIDO PARA MÓVIL =================
+// ================= ORDENES Y COLA =================
 function solicitarConfirmacion(tipo) {
     const carrito = getCarrito();
     if(carrito.length === 0) return mostrarToast('El carrito está vacío');
@@ -409,12 +410,18 @@ function solicitarConfirmacion(tipo) {
     else if(tipo === 'whatsapp') mensaje = "¿Seguro que deseas enviar el pedido por WhatsApp?";
     
     document.getElementById('textoConfirmacion').innerText = mensaje + " Se guardará en la cola de espera.";
+    
+    // Abrir ventana de impresión ANTES de ocultar el modal (crucial en móvil)
     document.getElementById('btnConfirmarAccion').onclick = async function() {
+        if (accionPendiente === 'imprimir_descargar') {
+            printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                mostrarToast('⚠️ Permite las ventanas emergentes para imprimir la cotización.');
+                printWindow = null;
+            }
+        }
         modalConfirmacionInst.hide();
-        // Esperar a que el modal se cierre completamente antes de continuar
-        setTimeout(async () => {
-            await prepararDatosParaAccion();
-        }, 300);
+        await prepararDatosParaAccion();
     };
     modalConfirmacionInst.show();
 }
@@ -423,10 +430,6 @@ async function prepararDatosParaAccion() {
     if(usuarioActual && currentUser) {
         await ejecutarAccionConDatos(currentUser);
     } else {
-        // Limpiar formulario antes de mostrar
-        document.getElementById('invNombre').value = '';
-        document.getElementById('invApellido').value = '';
-        document.getElementById('invTelefono').value = '';
         modalDatosInvitadoInst.show();
     }
 }
@@ -440,11 +443,7 @@ async function confirmarDatosInvitado() {
 
   invitadoTemp = { nombre, apellido, telefono };
   modalDatosInvitadoInst.hide();
-  
-  // Esperar a que el modal se cierre completamente
-  setTimeout(async () => {
-      await ejecutarAccionConDatos(invitadoTemp);
-  }, 300);
+  await ejecutarAccionConDatos(invitadoTemp);
 }
 
 async function ejecutarAccionConDatos(clienteData) {
@@ -471,25 +470,25 @@ async function ejecutarAccionConDatos(clienteData) {
   const { count } = await supabaseClient.from('pedidos').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente');
   const turno = count;
 
-  // Limpiar carrito ANTES de mostrar modales
-  limpiarCarrito();
-  actualizarContadorCarrito();
+  document.getElementById('numeroTurnoExito').innerText = `#${turno}`;
+  modalExitoOrdenInst.show();
 
-  // Ejecutar acción según el tipo
   if (accionPendiente === 'imprimir_descargar') {
-    abrirVentanaImpresion(newPedido, turno);
+      if (printWindow) {
+          imprimirFactura(newPedido, turno, printWindow);
+      } else {
+          mostrarToast('Impresión bloqueada, pero el pedido se guardó en la cola.');
+      }
   } else if (accionPendiente === 'whatsapp') {
-    enviarPorWhatsApp(newPedido, turno);
+      enviarPorWhatsApp(newPedido, turno);
   }
 
-  // Mostrar modal de éxito AL FINAL
-  setTimeout(() => {
-      document.getElementById('numeroTurnoExito').innerText = `#${turno}`;
-      modalExitoOrdenInst.show();
-  }, 500);
-
+  limpiarCarrito();
+  cargarCarrito(); // Actualiza inmediatamente la vista del carrito (incluso si está vacío)
+  actualizarContadorCarrito();
   invitadoTemp = null;
   accionPendiente = null;
+  printWindow = null;
 }
 
 function enviarPorWhatsApp(pedido, turno) {
@@ -502,162 +501,125 @@ function enviarPorWhatsApp(pedido, turno) {
   window.open(url, '_blank');
 }
 
-// ================= FUNCIÓN DE IMPRESIÓN MEJORADA PARA MÓVIL =================
-function abrirVentanaImpresion(pedido, turno) {
-  let filasHTML = '';
-  pedido.items.forEach(i => {
-    filasHTML += `
-      <tr>
-          <td style="padding:10px;"><img src="${i.img}" style="width:50px; border-radius:5px;"></td>
-          <td style="padding:10px;">${i.nombre}</td>
-          <td style="padding:10px; text-align:center;">${i.cantidad}</td>
-          <td style="padding:10px; text-align:right;">${formatearRD(i.precio)}</td>
-          <td style="padding:10px; text-align:right;">${formatearRD(i.precio * i.cantidad)}</td>
-      </tr>`;
-  });
+// ================= FUNCIÓN UNIFICADA DE IMPRESIÓN (mejor para móvil) =================
+function imprimirFactura(pedido, turno, targetWin = null) {
+    let win = targetWin || window.open('', '_blank');
+    if (!win) {
+        mostrarToast('⚠️ No se pudo abrir ventana de impresión. Permite pop-ups.');
+        return;
+    }
 
-  const ventana = window.open('', '_blank', 'width=800,height=600');
-  
-  if(!ventana) {
-    return mostrarToast('⚠️ Permite las ventanas emergentes para imprimir.');
-  }
+    let filasHTML = '';
+    pedido.items.forEach(i => {
+        filasHTML += `
+          <tr>
+              <td style="padding:10px;"><img src="${i.img}" style="width:50px; border-radius:5px;"></td>
+              <td style="padding:10px;">${i.nombre}</td>
+              <td style="padding:10px; text-align:center;">${i.cantidad}</td>
+              <td style="padding:10px; text-align:right;">${formatearRD(i.precio)}</td>
+              <td style="padding:10px; text-align:right;">${formatearRD(i.precio * i.cantidad)}</td>
+          </tr>`;
+    });
 
-  ventana.document.write(`
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <title>Factura #${pedido.id}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta charset="UTF-8">
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { 
-        font-family: Arial, sans-serif; 
-        color: #333; 
-        max-width: 800px; 
-        margin: 0 auto; 
-        padding: 20px; 
-        font-size: 14px; 
-      }
-      table { width: 100%; border-collapse: collapse; }
-      th, td { border-bottom: 1px solid #eee; }
-      img { max-width: 100%; height: auto; }
-      @media print {
-        .no-print { display: none !important; }
-        body { padding: 10px; }
-      }
-      @media screen and (max-width: 600px) {
-        body { padding: 10px; font-size: 12px; }
-        table { font-size: 11px; }
-        img { width: 40px !important; }
-      }
-      .btn-container {
-        position: sticky;
-        top: 0;
-        background: white;
-        padding: 10px 0;
-        z-index: 1000;
-        margin-bottom: 20px;
-      }
-      .btn-cerrar, .btn-imprimir {
-        display: inline-block; 
-        width: 48%; 
-        padding: 15px; 
-        text-align: center; 
-        text-decoration: none; 
-        border-radius: 8px; 
-        font-weight: bold;
-        border: none;
-        cursor: pointer;
-        font-size: 14px;
-      }
-      .btn-cerrar {
-        background: #dc3545;
-        color: white;
-        margin-right: 2%;
-      }
-      .btn-imprimir {
-        background: #28a745;
-        color: white;
-        margin-left: 2%;
-      }
-    </style>
-  </head>
-  <body>
-      <div class="no-print btn-container">
-        <button onclick="window.close()" class="btn-cerrar">✕ Cerrar</button>
-        <button onclick="window.print()" class="btn-imprimir">🖨️ Imprimir</button>
-      </div>
+    const turnoHTML = turno ? `<div style="margin-top:15px; font-size:20px; color:#6a1b9a; font-weight:bold;">Tu turno: #${turno}</div>` : '';
 
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6a1b9a; padding-bottom:20px; margin-bottom:30px; flex-wrap: wrap;">
-          <div style="text-align: left; flex: 1; min-width: 200px;">
-              <img src="Logo.PNG" style="height:60px; display:block; margin-bottom:10px;" alt="Logo" onerror="this.style.display='none'">
-              <h2 style="margin:0; color:#6a1b9a; line-height:1;">Mariposas Cuties</h2>
-              <div style="font-size:12px; margin-top:5px;">Salcedo-Tenares</div>
-          </div>
-          <div style="text-align:right; flex: 1; min-width: 200px;">
-              <h1 style="margin:0; color:#6a1b9a; font-size: 24px; letter-spacing: 2px;">FACTURA</h1>
-              <p style="font-size:14px; margin:5px 0 0 0; font-weight:bold; color:#555;">${pedido.fecha}</p>
-              <p style="font-size:12px; margin:2px 0 0 0; color:#888;">ID: ${pedido.id}</p>
-          </div>
-      </div>
-      
-      <div style="background:#f9f9f9; padding:20px; border-radius:10px; margin-bottom:30px;">
-          <table style="width:100%;">
-              <tr>
-                  <td>
-                      <div style="font-size:11px; text-transform:uppercase; color:#999; margin-bottom:5px;">Facturar a:</div>
-                      <div style="font-size:16px; font-weight:bold;">${pedido.cliente.nombre} ${pedido.cliente.apellido}</div>
-                      <div>${pedido.cliente.telefono}</div>
-                  </td>
-                  <td style="text-align:right; vertical-align:bottom;">
-                       <div style="font-size:14px;">Estado: <b>${pedido.estado.toUpperCase()}</b></div>
-                       <div style="font-size:14px; margin-top:5px;">Turno: <b>#${turno}</b></div>
-                  </td>
-              </tr>
-          </table>
-      </div>
+    win.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Factura #${pedido.id}</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border-bottom: 1px solid #eee; }
+        @media print { .no-print { display: none !important; } }
+        .btn-cerrar { display: block; width: 100%; padding: 15px; background: #eee; text-align: center; text-decoration: none; color: #333; border-radius: 8px; margin-bottom: 20px; font-weight: bold; }
+      </style>
+    </head>
+    <body>
+        <a href="#" onclick="window.close()" class="no-print btn-cerrar">Cerrar Ventana</a>
 
-      <div style="overflow-x: auto;">
-          <table style="width:100%; border-collapse:collapse; margin-bottom:30px;">
-              <thead style="background:#6a1b9a; color:white;">
-                  <tr>
-                      <th style="padding:10px;">Img</th>
-                      <th style="padding:10px; text-align:left;">Producto</th>
-                      <th style="padding:10px;">Cant.</th>
-                      <th style="padding:10px; text-align:right;">Precio</th>
-                      <th style="padding:10px; text-align:right;">Total</th>
-                  </tr>
-              </thead>
-              <tbody>${filasHTML}</tbody>
-          </table>
-      </div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6a1b9a; padding-bottom:20px; margin-bottom:30px;">
+            <div style="text-align: left;">
+                <img src="Logo.PNG" style="height:60px; display:block; margin-bottom:10px;" alt="Logo" onerror="this.style.display='none'">
+                <h2 style="margin:0; color:#6a1b9a; line-height:1;">Mariposas Cuties</h2>
+                <div style="font-size:12px; margin-top:5px;">Salcedo-Tenares</div>
+            </div>
+            <div style="text-align:right;">
+                <h1 style="margin:0; color:#6a1b9a; font-size: 24px; letter-spacing: 2px;">FACTURA</h1>
+                <p style="font-size:14px; margin:5px 0 0 0; font-weight:bold; color:#555;">${pedido.fecha}</p>
+                <p style="font-size:12px; margin:2px 0 0 0; color:#888;">ID: ${pedido.id}</p>
+            </div>
+        </div>
+        
+        <div style="background:#f9f9f9; padding:20px; border-radius:10px; margin-bottom:30px;">
+            <table style="width:100%;">
+                <tr>
+                    <td>
+                        <div style="font-size:11px; text-transform:uppercase; color:#999; margin-bottom:5px;">Facturar a:</div>
+                        <div style="font-size:16px; font-weight:bold;">${pedido.cliente.nombre} ${pedido.cliente.apellido}</div>
+                        <div>${pedido.cliente.telefono}</div>
+                        ${turnoHTML}
+                    </td>
+                    <td style="text-align:right; vertical-align:bottom;">
+                         <div style="font-size:14px;">Estado: <b>${pedido.estado.toUpperCase()}</b></div>
+                    </td>
+                </tr>
+            </table>
+        </div>
 
-      <div style="text-align:right; margin-top:20px;">
-          <div style="display:inline-block; text-align:right; border-top: 1px solid #ccc; padding-top:10px;">
-              <div style="font-size:18px; margin-bottom:5px;">Total a Pagar</div>
-              <div style="font-size:24px; font-weight:bold; color:#6a1b9a;">${formatearRD(pedido.total)}</div>
-          </div>
-      </div>
-      
-      <div style="margin-top:50px; text-align:center; font-size:12px; color:#999; border-top:1px dashed #ddd; padding-top:20px;">
-          Gracias por preferir Mariposas Cuties.<br>
-          ¡Vuelva pronto!
-      </div>
+        <div style="overflow-x: auto;">
+            <table style="width:100%; border-collapse:collapse; margin-bottom:30px;">
+                <thead style="background:#6a1b9a; color:white;">
+                    <tr>
+                        <th style="padding:10px;">Img</th>
+                        <th style="padding:10px; text-align:left;">Producto</th>
+                        <th style="padding:10px;">Cant.</th>
+                        <th style="padding:10px; text-align:right;">Precio</th>
+                        <th style="padding:10px; text-align:right;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>${filasHTML}</tbody>
+            </table>
+        </div>
 
-      <script>
-          // Función para imprimir automáticamente en móvil y PC
-          window.onload = function() {
-              setTimeout(function(){
-                  window.focus();
-              }, 300);
-          }
-      </script>
-  </body>
-  </html>`);
-  ventana.document.close();
+        <div style="text-align:right; margin-top:20px;">
+            <div style="display:inline-block; text-align:right; border-top: 1px solid #ccc; padding-top:10px;">
+                <div style="font-size:18px; margin-bottom:5px;">Total a Pagar</div>
+                <div style="font-size:24px; font-weight:bold; color:#6a1b9a;">${formatearRD(pedido.total)}</div>
+            </div>
+        </div>
+        
+        <div style="margin-top:50px; text-align:center; font-size:12px; color:#999; border-top:1px dashed #ddd; padding-top:20px;">
+            Gracias por preferir Mariposas Cuties.<br>
+            ¡Vuelva pronto!
+        </div>
+
+        <script>
+            window.onafterprint = function() { window.close(); };
+            if (window.matchMedia) {
+                var mediaQueryList = window.matchMedia('print');
+                mediaQueryList.addListener(function(mql) {
+                    if (!mql.matches) { window.close(); }
+                });
+            }
+            // Delay mayor para móviles
+            setTimeout(() => { win.focus(); win.print(); }, 1500);
+        </script>
+    </body>
+    </html>`);
+    win.document.close();
 }
 
+function reimprimirPedidoDesdeModal() { 
+    if(pedidoActualParaImprimir) {
+        let turno = (pedidoActualParaImprimir.estado === 'pendiente') 
+            ? calcularTurnoActualDePedido(pedidoActualParaImprimir.id) 
+            : null;
+        imprimirFactura(pedidoActualParaImprimir, turno);
+    }
+}
 
 // ================= ADMIN LOGIC =================
 async function actualizarBadgeColaAdmin() {
@@ -810,15 +772,6 @@ function calcularTurnoActualDePedido(id) {
   const pendientes = historialPedidos.filter(p => p.estado === 'pendiente').sort((a,b) => a.id - b.id);
   const index = pendientes.findIndex(p => p.id === id);
   return index !== -1 ? index + 1 : '-';
-}
-
-function reimprimirPedidoDesdeModal() { 
-    if(pedidoActualParaImprimir) {
-        let turno = (pedidoActualParaImprimir.estado === 'pendiente') 
-            ? calcularTurnoActualDePedido(pedidoActualParaImprimir.id) 
-            : "-";
-        abrirVentanaImpresion(pedidoActualParaImprimir, turno); 
-    }
 }
 
 async function borrarHistorialCompleto() {
@@ -1004,9 +957,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   toastBootstrap = new bootstrap.Toast(document.getElementById('liveToast'));
   modalCategoriaInst = new bootstrap.Modal(document.getElementById('modalCategoria'));
   modalProductoInst = new bootstrap.Modal(document.getElementById('modalProducto'));
-  modalDatosInvitadoInst = new bootstrap.Modal(document.getElementById('modalDatosInvitado'));
+  
+  // Modales críticos en móvil: no se cierran tocando fuera ni con Esc
+  modalDatosInvitadoInst = new bootstrap.Modal(document.getElementById('modalDatosInvitado'), {backdrop: 'static', keyboard: false});
+  modalConfirmacionInst = new bootstrap.Modal(document.getElementById('modalConfirmacion'), {backdrop: 'static', keyboard: false});
+  
   modalDetallePedidoInst = new bootstrap.Modal(document.getElementById('modalDetallePedido'));
-  modalConfirmacionInst = new bootstrap.Modal(document.getElementById('modalConfirmacion'));
   modalExitoOrdenInst = new bootstrap.Modal(document.getElementById('modalExitoOrden'));
   
   if (usuarioActual) {
