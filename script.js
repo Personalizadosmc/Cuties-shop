@@ -501,7 +501,7 @@ function enviarPorWhatsApp(pedido, turno) {
   window.open(url, '_blank');
 }
 
-// ================= FUNCIÓN UNIFICADA DE IMPRESIÓN (actualizada con botones Cerrar rojo y Descargar PDF) =================
+// ================= FUNCIÓN UNIFICADA DE IMPRESIÓN (actualizada: SIN impresión automática, botones manuales) =================
 function imprimirFactura(pedido, turno, targetWin = null) {
     let win = targetWin || window.open('', '_blank');
     if (!win) {
@@ -533,9 +533,9 @@ function imprimirFactura(pedido, turno, targetWin = null) {
     <head>
       <title>Factura #${pedido.id}</title>
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <!-- Bootstrap para que los botones se vean bonitos -->
+      <!-- Bootstrap para botones bonitos -->
       <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-      <!-- html2pdf.js para descargar como PDF -->
+      <!-- html2pdf.js para descargar PDF -->
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
       <style>
         body { font-family: Arial, sans-serif; color: #333; padding: 20px; }
@@ -548,13 +548,14 @@ function imprimirFactura(pedido, turno, targetWin = null) {
       </style>
     </head>
     <body>
-        <!-- Botones (no se imprimen ni se incluyen en el PDF) -->
-        <div class="no-print d-flex justify-content-center gap-4 my-4">
-            <button class="btn btn-danger px-5 py-2" onclick="window.close()">Cerrar Ventana</button>
-            <button class="btn btn-success px-5 py-2" onclick="descargarPDF()">Descargar PDF</button>
+        <!-- Tres botones manuales (no se imprimen ni descargan en PDF) -->
+        <div class="no-print d-flex flex-wrap justify-content-center gap-3 my-4">
+            <button class="btn btn-danger px-5 py-3 fs-5" onclick="window.close()">Cerrar Ventana</button>
+            <button class="btn btn-primary px-5 py-3 fs-5" onclick="window.print()">Imprimir</button>
+            <button class="btn btn-success px-5 py-3 fs-5" onclick="descargarPDF()">Descargar PDF</button>
         </div>
 
-        <!-- Contenido de la factura (esto sí se imprime y descarga) -->
+        <!-- Contenido de la factura -->
         <div id="facturaContent">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6a1b9a; padding-bottom:20px; margin-bottom:30px;">
                 <div style="text-align: left;">
@@ -614,12 +615,12 @@ function imprimirFactura(pedido, turno, targetWin = null) {
         </div>
 
         <script>
-            // Función para descargar el PDF (solo el contenido de la factura)
+            // Función descargar PDF (solo el contenido de la factura)
             function descargarPDF() {
                 const element = document.getElementById('facturaContent');
-                let filename = 'Factura-${pedido.id}.pdf';
+                let filename = 'Cotizacion-${pedido.id}.pdf';
                 if ("${turnoDisplay}" !== '') {
-                    filename = 'Factura-${pedido.id}-Turno${turnoDisplay}.pdf';
+                    filename = 'Cotizacion-${pedido.id}-Turno${turnoDisplay}.pdf';
                 }
                 const opt = {
                     margin:       10,
@@ -631,20 +632,20 @@ function imprimirFactura(pedido, turno, targetWin = null) {
                 html2pdf().set(opt).from(element).save();
             }
 
-            // Cierre automático después de imprimir
-            window.onafterprint = function() { window.close(); };
+            // Cierre automático SOLO después de imprimir
+            window.onafterprint = function() { 
+                window.close(); 
+            };
             if (window.matchMedia) {
                 var mediaQueryList = window.matchMedia('print');
                 mediaQueryList.addListener(function(mql) {
-                    if (!mql.matches) { window.close(); }
+                    if (!mql.matches) { 
+                        window.close(); 
+                    }
                 });
             }
 
-            // Impresión automática con delay mayor para que carguen scripts e imágenes
-            setTimeout(() => {
-                window.focus();
-                window.print();
-            }, 2500);
+            // REMOVIDO: No hay impresión automática → el usuario decide con el botón
         </script>
     </body>
     </html>`);
@@ -1020,4 +1021,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   actualizarInterfaz();
   irASeccion('portada');
 });
+
 
