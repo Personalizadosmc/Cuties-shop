@@ -2,7 +2,7 @@
 const SUPABASE_URL = 'https://yhdaskochzbqktusekbt.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InloZGFza29jaHpicWt0dXNla2J0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc0OTE1MDAsImV4cCI6MjA4MzA2NzUwMH0.kAHQ90Wjy3R_X81e2DZCMtSjJfXp2wlTqnBFBgtJo9M';
 
-const { createClient } = supabase; // Usamos la función global del CDN
+const { createClient } = supabase;
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let categorias = [];
@@ -398,7 +398,7 @@ function vaciarCarrito() {
   actualizarContadorCarrito(); 
 }
 
-// ================= ORDENES Y COLA =================
+// ================= ORDENES Y COLA - CORREGIDO PARA MÓVIL =================
 function solicitarConfirmacion(tipo) {
     const carrito = getCarrito();
     if(carrito.length === 0) return mostrarToast('El carrito está vacío');
@@ -411,7 +411,10 @@ function solicitarConfirmacion(tipo) {
     document.getElementById('textoConfirmacion').innerText = mensaje + " Se guardará en la cola de espera.";
     document.getElementById('btnConfirmarAccion').onclick = async function() {
         modalConfirmacionInst.hide();
-        await prepararDatosParaAccion();
+        // Esperar a que el modal se cierre completamente antes de continuar
+        setTimeout(async () => {
+            await prepararDatosParaAccion();
+        }, 300);
     };
     modalConfirmacionInst.show();
 }
@@ -420,6 +423,10 @@ async function prepararDatosParaAccion() {
     if(usuarioActual && currentUser) {
         await ejecutarAccionConDatos(currentUser);
     } else {
+        // Limpiar formulario antes de mostrar
+        document.getElementById('invNombre').value = '';
+        document.getElementById('invApellido').value = '';
+        document.getElementById('invTelefono').value = '';
         modalDatosInvitadoInst.show();
     }
 }
@@ -433,7 +440,11 @@ async function confirmarDatosInvitado() {
 
   invitadoTemp = { nombre, apellido, telefono };
   modalDatosInvitadoInst.hide();
-  await ejecutarAccionConDatos(invitadoTemp);
+  
+  // Esperar a que el modal se cierre completamente
+  setTimeout(async () => {
+      await ejecutarAccionConDatos(invitadoTemp);
+  }, 300);
 }
 
 async function ejecutarAccionConDatos(clienteData) {
@@ -460,17 +471,23 @@ async function ejecutarAccionConDatos(clienteData) {
   const { count } = await supabaseClient.from('pedidos').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente');
   const turno = count;
 
-  document.getElementById('numeroTurnoExito').innerText = `#${turno}`;
-  modalExitoOrdenInst.show();
+  // Limpiar carrito ANTES de mostrar modales
+  limpiarCarrito();
+  actualizarContadorCarrito();
 
+  // Ejecutar acción según el tipo
   if (accionPendiente === 'imprimir_descargar') {
     abrirVentanaImpresion(newPedido, turno);
   } else if (accionPendiente === 'whatsapp') {
     enviarPorWhatsApp(newPedido, turno);
   }
 
-  limpiarCarrito();
-  actualizarContadorCarrito();
+  // Mostrar modal de éxito AL FINAL
+  setTimeout(() => {
+      document.getElementById('numeroTurnoExito').innerText = `#${turno}`;
+      modalExitoOrdenInst.show();
+  }, 500);
+
   invitadoTemp = null;
   accionPendiente = null;
 }
@@ -485,7 +502,7 @@ function enviarPorWhatsApp(pedido, turno) {
   window.open(url, '_blank');
 }
 
-// ================= MODIFICADO: FUNCIÓN DE IMPRESIÓN =================
+// ================= FUNCIÓN DE IMPRESIÓN MEJORADA PARA MÓVIL =================
 function abrirVentanaImpresion(pedido, turno) {
   let filasHTML = '';
   pedido.items.forEach(i => {
@@ -499,7 +516,7 @@ function abrirVentanaImpresion(pedido, turno) {
       </tr>`;
   });
 
-  const ventana = window.open('', '_blank');
+  const ventana = window.open('', '_blank', 'width=800,height=600');
   
   if(!ventana) {
     return mostrarToast('⚠️ Permite las ventanas emergentes para imprimir.');
@@ -511,37 +528,74 @@ function abrirVentanaImpresion(pedido, turno) {
   <head>
     <title>Factura #${pedido.id}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
     <style>
-      body { font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; font-size: 14px; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { 
+        font-family: Arial, sans-serif; 
+        color: #333; 
+        max-width: 800px; 
+        margin: 0 auto; 
+        padding: 20px; 
+        font-size: 14px; 
+      }
       table { width: 100%; border-collapse: collapse; }
       th, td { border-bottom: 1px solid #eee; }
+      img { max-width: 100%; height: auto; }
       @media print {
         .no-print { display: none !important; }
+        body { padding: 10px; }
       }
-      .btn-cerrar {
-        display: block; 
-        width: 100%; 
+      @media screen and (max-width: 600px) {
+        body { padding: 10px; font-size: 12px; }
+        table { font-size: 11px; }
+        img { width: 40px !important; }
+      }
+      .btn-container {
+        position: sticky;
+        top: 0;
+        background: white;
+        padding: 10px 0;
+        z-index: 1000;
+        margin-bottom: 20px;
+      }
+      .btn-cerrar, .btn-imprimir {
+        display: inline-block; 
+        width: 48%; 
         padding: 15px; 
-        background: #eee; 
         text-align: center; 
         text-decoration: none; 
-        color: #333; 
         border-radius: 8px; 
-        margin-bottom: 20px;
         font-weight: bold;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .btn-cerrar {
+        background: #dc3545;
+        color: white;
+        margin-right: 2%;
+      }
+      .btn-imprimir {
+        background: #28a745;
+        color: white;
+        margin-left: 2%;
       }
     </style>
   </head>
   <body>
-      <a href="#" onclick="window.close()" class="no-print btn-cerrar">Cerrar Ventana</a>
+      <div class="no-print btn-container">
+        <button onclick="window.close()" class="btn-cerrar">✕ Cerrar</button>
+        <button onclick="window.print()" class="btn-imprimir">🖨️ Imprimir</button>
+      </div>
 
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6a1b9a; padding-bottom:20px; margin-bottom:30px;">
-          <div style="text-align: left;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6a1b9a; padding-bottom:20px; margin-bottom:30px; flex-wrap: wrap;">
+          <div style="text-align: left; flex: 1; min-width: 200px;">
               <img src="Logo.PNG" style="height:60px; display:block; margin-bottom:10px;" alt="Logo" onerror="this.style.display='none'">
               <h2 style="margin:0; color:#6a1b9a; line-height:1;">Mariposas Cuties</h2>
               <div style="font-size:12px; margin-top:5px;">Salcedo-Tenares</div>
           </div>
-          <div style="text-align:right;">
+          <div style="text-align:right; flex: 1; min-width: 200px;">
               <h1 style="margin:0; color:#6a1b9a; font-size: 24px; letter-spacing: 2px;">FACTURA</h1>
               <p style="font-size:14px; margin:5px 0 0 0; font-weight:bold; color:#555;">${pedido.fecha}</p>
               <p style="font-size:12px; margin:2px 0 0 0; color:#888;">ID: ${pedido.id}</p>
@@ -558,6 +612,7 @@ function abrirVentanaImpresion(pedido, turno) {
                   </td>
                   <td style="text-align:right; vertical-align:bottom;">
                        <div style="font-size:14px;">Estado: <b>${pedido.estado.toUpperCase()}</b></div>
+                       <div style="font-size:14px; margin-top:5px;">Turno: <b>#${turno}</b></div>
                   </td>
               </tr>
           </table>
@@ -591,34 +646,17 @@ function abrirVentanaImpresion(pedido, turno) {
       </div>
 
       <script>
+          // Función para imprimir automáticamente en móvil y PC
           window.onload = function() {
-              // Pequeño retraso para que carguen imágenes en móvil
               setTimeout(function(){
                   window.focus();
-                  window.print();
-              }, 500);
-          }
-
-          // Intentar cerrar automáticamente después de imprimir (funciona en Chrome/Android)
-          window.onafterprint = function() {
-              window.close();
-          };
-
-          // Soporte adicional para cerrar al detectar cambio de estado de impresión (Safari/iOS)
-          if (window.matchMedia) {
-              var mediaQueryList = window.matchMedia('print');
-              mediaQueryList.addListener(function(mql) {
-                  if (!mql.matches) {
-                      window.close();
-                  }
-              });
+              }, 300);
           }
       </script>
   </body>
   </html>`);
   ventana.document.close();
 }
-// ================= FIN MODIFICACION =================
 
 
 // ================= ADMIN LOGIC =================
@@ -785,7 +823,7 @@ function reimprimirPedidoDesdeModal() {
 
 async function borrarHistorialCompleto() {
     if(confirm('¿Estás seguro de borrar TODO el historial? (Incluyendo la cola de espera)')) {
-        const { error } = await supabaseClient.from('pedidos').delete().neq('id', 0); // Borra todos
+        const { error } = await supabaseClient.from('pedidos').delete().neq('id', 0);
         if (error) {
           mostrarToast('Error al borrar historial');
           return;
@@ -985,4 +1023,3 @@ document.addEventListener('DOMContentLoaded', async () => {
   actualizarInterfaz();
   irASeccion('portada');
 });
-
