@@ -537,7 +537,7 @@ function abrirVentanaImpresion(pedido, turno) {
 
       <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6a1b9a; padding-bottom:20px; margin-bottom:30px;">
           <div style="text-align: left;">
-              <img src="Logo.png" style="height:60px; display:block; margin-bottom:10px;" alt="Logo" onerror="this.style.display='none'">
+              <img src="Logo.PNG" style="height:60px; display:block; margin-bottom:10px;" alt="Logo" onerror="this.style.display='none'">
               <h2 style="margin:0; color:#6a1b9a; line-height:1;">Mariposas Cuties</h2>
               <div style="font-size:12px; margin-top:5px;">Salcedo-Tenares</div>
           </div>
@@ -985,3 +985,4 @@ document.addEventListener('DOMContentLoaded', async () => {
   actualizarInterfaz();
   irASeccion('portada');
 });
+
