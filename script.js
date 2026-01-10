@@ -501,7 +501,7 @@ function enviarPorWhatsApp(pedido, turno) {
   window.open(url, '_blank');
 }
 
-// ================= FUNCIÓN UNIFICADA DE IMPRESIÓN (mejor para móvil) =================
+// ================= FUNCIÓN UNIFICADA DE IMPRESIÓN (actualizada con botones Cerrar rojo y Descargar PDF) =================
 function imprimirFactura(pedido, turno, targetWin = null) {
     let win = targetWin || window.open('', '_blank');
     if (!win) {
@@ -521,7 +521,11 @@ function imprimirFactura(pedido, turno, targetWin = null) {
           </tr>`;
     });
 
-    const turnoHTML = turno ? `<div style="margin-top:15px; font-size:20px; color:#6a1b9a; font-weight:bold;">Tu turno: #${turno}</div>` : '';
+    let turnoDisplay = '';
+    if (turno && turno !== '-' && turno !== null) {
+        turnoDisplay = `#${turno}`;
+    }
+    const turnoHTML = turnoDisplay ? `<div style="margin-top:15px; font-size:20px; color:#6a1b9a; font-weight:bold;">Tu turno: ${turnoDisplay}</div>` : '';
 
     win.document.write(`
     <!DOCTYPE html>
@@ -529,74 +533,105 @@ function imprimirFactura(pedido, turno, targetWin = null) {
     <head>
       <title>Factura #${pedido.id}</title>
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <!-- Bootstrap para que los botones se vean bonitos -->
+      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+      <!-- html2pdf.js para descargar como PDF -->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
       <style>
-        body { font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; font-size: 14px; }
+        body { font-family: Arial, sans-serif; color: #333; padding: 20px; }
         table { width: 100%; border-collapse: collapse; }
         th, td { border-bottom: 1px solid #eee; }
-        @media print { .no-print { display: none !important; } }
-        .btn-cerrar { display: block; width: 100%; padding: 15px; background: #eee; text-align: center; text-decoration: none; color: #333; border-radius: 8px; margin-bottom: 20px; font-weight: bold; }
+        @media print {
+          .no-print { display: none !important; }
+        }
+        #facturaContent { max-width: 800px; margin: 0 auto; }
       </style>
     </head>
     <body>
-        <a href="#" onclick="window.close()" class="no-print btn-cerrar">Cerrar Ventana</a>
-
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6a1b9a; padding-bottom:20px; margin-bottom:30px;">
-            <div style="text-align: left;">
-                <img src="Logo.PNG" style="height:60px; display:block; margin-bottom:10px;" alt="Logo" onerror="this.style.display='none'">
-                <h2 style="margin:0; color:#6a1b9a; line-height:1;">Mariposas Cuties</h2>
-                <div style="font-size:12px; margin-top:5px;">Salcedo-Tenares</div>
-            </div>
-            <div style="text-align:right;">
-                <h1 style="margin:0; color:#6a1b9a; font-size: 24px; letter-spacing: 2px;">FACTURA</h1>
-                <p style="font-size:14px; margin:5px 0 0 0; font-weight:bold; color:#555;">${pedido.fecha}</p>
-                <p style="font-size:12px; margin:2px 0 0 0; color:#888;">ID: ${pedido.id}</p>
-            </div>
-        </div>
-        
-        <div style="background:#f9f9f9; padding:20px; border-radius:10px; margin-bottom:30px;">
-            <table style="width:100%;">
-                <tr>
-                    <td>
-                        <div style="font-size:11px; text-transform:uppercase; color:#999; margin-bottom:5px;">Facturar a:</div>
-                        <div style="font-size:16px; font-weight:bold;">${pedido.cliente.nombre} ${pedido.cliente.apellido}</div>
-                        <div>${pedido.cliente.telefono}</div>
-                        ${turnoHTML}
-                    </td>
-                    <td style="text-align:right; vertical-align:bottom;">
-                         <div style="font-size:14px;">Estado: <b>${pedido.estado.toUpperCase()}</b></div>
-                    </td>
-                </tr>
-            </table>
+        <!-- Botones (no se imprimen ni se incluyen en el PDF) -->
+        <div class="no-print d-flex justify-content-center gap-4 my-4">
+            <button class="btn btn-danger px-5 py-2" onclick="window.close()">Cerrar Ventana</button>
+            <button class="btn btn-success px-5 py-2" onclick="descargarPDF()">Descargar PDF</button>
         </div>
 
-        <div style="overflow-x: auto;">
-            <table style="width:100%; border-collapse:collapse; margin-bottom:30px;">
-                <thead style="background:#6a1b9a; color:white;">
+        <!-- Contenido de la factura (esto sí se imprime y descarga) -->
+        <div id="facturaContent">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6a1b9a; padding-bottom:20px; margin-bottom:30px;">
+                <div style="text-align: left;">
+                    <img src="Logo.PNG" style="height:60px; display:block; margin-bottom:10px;" alt="Logo" onerror="this.style.display='none'">
+                    <h2 style="margin:0; color:#6a1b9a; line-height:1;">Mariposas Cuties</h2>
+                    <div style="font-size:12px; margin-top:5px;">Salcedo-Tenares</div>
+                </div>
+                <div style="text-align:right;">
+                    <h1 style="margin:0; color:#6a1b9a; font-size: 24px; letter-spacing: 2px;">FACTURA</h1>
+                    <p style="font-size:14px; margin:5px 0 0 0; font-weight:bold; color:#555;">${pedido.fecha}</p>
+                    <p style="font-size:12px; margin:2px 0 0 0; color:#888;">ID: ${pedido.id}</p>
+                </div>
+            </div>
+            
+            <div style="background:#f9f9f9; padding:20px; border-radius:10px; margin-bottom:30px;">
+                <table style="width:100%;">
                     <tr>
-                        <th style="padding:10px;">Img</th>
-                        <th style="padding:10px; text-align:left;">Producto</th>
-                        <th style="padding:10px;">Cant.</th>
-                        <th style="padding:10px; text-align:right;">Precio</th>
-                        <th style="padding:10px; text-align:right;">Total</th>
+                        <td>
+                            <div style="font-size:11px; text-transform:uppercase; color:#999; margin-bottom:5px;">Facturar a:</div>
+                            <div style="font-size:16px; font-weight:bold;">${pedido.cliente.nombre} ${pedido.cliente.apellido}</div>
+                            <div>${pedido.cliente.telefono}</div>
+                            ${turnoHTML}
+                        </td>
+                        <td style="text-align:right; vertical-align:bottom;">
+                             <div style="font-size:14px;">Estado: <b>${pedido.estado.toUpperCase()}</b></div>
+                        </td>
                     </tr>
-                </thead>
-                <tbody>${filasHTML}</tbody>
-            </table>
-        </div>
-
-        <div style="text-align:right; margin-top:20px;">
-            <div style="display:inline-block; text-align:right; border-top: 1px solid #ccc; padding-top:10px;">
-                <div style="font-size:18px; margin-bottom:5px;">Total a Pagar</div>
-                <div style="font-size:24px; font-weight:bold; color:#6a1b9a;">${formatearRD(pedido.total)}</div>
+                </table>
             </div>
-        </div>
-        
-        <div style="margin-top:50px; text-align:center; font-size:12px; color:#999; border-top:1px dashed #ddd; padding-top:20px;">
-            Gracias por preferir Mariposas Cuties.<br>
-            ¡Vuelva pronto!
+
+            <div style="overflow-x: auto;">
+                <table style="width:100%; border-collapse:collapse; margin-bottom:30px;">
+                    <thead style="background:#6a1b9a; color:white;">
+                        <tr>
+                            <th style="padding:10px;">Img</th>
+                            <th style="padding:10px; text-align:left;">Producto</th>
+                            <th style="padding:10px;">Cant.</th>
+                            <th style="padding:10px; text-align:right;">Precio</th>
+                            <th style="padding:10px; text-align:right;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>${filasHTML}</tbody>
+                </table>
+            </div>
+
+            <div style="text-align:right; margin-top:20px;">
+                <div style="display:inline-block; text-align:right; border-top: 1px solid #ccc; padding-top:10px;">
+                    <div style="font-size:18px; margin-bottom:5px;">Total a Pagar</div>
+                    <div style="font-size:24px; font-weight:bold; color:#6a1b9a;">${formatearRD(pedido.total)}</div>
+                </div>
+            </div>
+            
+            <div style="margin-top:50px; text-align:center; font-size:12px; color:#999; border-top:1px dashed #ddd; padding-top:20px;">
+                Gracias por preferir Mariposas Cuties.<br>
+                ¡Vuelva pronto!
+            </div>
         </div>
 
         <script>
+            // Función para descargar el PDF (solo el contenido de la factura)
+            function descargarPDF() {
+                const element = document.getElementById('facturaContent');
+                let filename = 'Factura-${pedido.id}.pdf';
+                if ("${turnoDisplay}" !== '') {
+                    filename = 'Factura-${pedido.id}-Turno${turnoDisplay}.pdf';
+                }
+                const opt = {
+                    margin:       10,
+                    filename:     filename,
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2 },
+                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+                html2pdf().set(opt).from(element).save();
+            }
+
+            // Cierre automático después de imprimir
             window.onafterprint = function() { window.close(); };
             if (window.matchMedia) {
                 var mediaQueryList = window.matchMedia('print');
@@ -604,14 +639,19 @@ function imprimirFactura(pedido, turno, targetWin = null) {
                     if (!mql.matches) { window.close(); }
                 });
             }
-            // Delay mayor para móviles
-            setTimeout(() => { win.focus(); win.print(); }, 1500);
+
+            // Impresión automática con delay mayor para que carguen scripts e imágenes
+            setTimeout(() => {
+                window.focus();
+                window.print();
+            }, 2500);
         </script>
     </body>
     </html>`);
     win.document.close();
 }
 
+// En la función reimprimirPedidoDesdeModal (actualizar para manejar turno correctamente)
 function reimprimirPedidoDesdeModal() { 
     if(pedidoActualParaImprimir) {
         let turno = (pedidoActualParaImprimir.estado === 'pendiente') 
@@ -620,6 +660,7 @@ function reimprimirPedidoDesdeModal() {
         imprimirFactura(pedidoActualParaImprimir, turno);
     }
 }
+
 
 // ================= ADMIN LOGIC =================
 async function actualizarBadgeColaAdmin() {
@@ -979,3 +1020,4 @@ document.addEventListener('DOMContentLoaded', async () => {
   actualizarInterfaz();
   irASeccion('portada');
 });
+
