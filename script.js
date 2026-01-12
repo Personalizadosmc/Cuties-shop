@@ -13,7 +13,7 @@ let usuarioActual = localStorage.getItem('usuarioActual') || null;
 let invitadoTemp = null; 
 let accionPendiente = null; 
 let pedidoActualParaImprimir = null; 
-let printWindow = null;  // Ventana de impresión global para manejar mejor en móvil
+let printWindow = null;  // Ventana de impresión global
 
 let toastBootstrap, modalCategoriaInst, modalProductoInst, modalDatosInvitadoInst, modalDetallePedidoInst, modalConfirmacionInst, modalExitoOrdenInst, modalDetalleInst;
 
@@ -411,15 +411,8 @@ function solicitarConfirmacion(tipo) {
     
     document.getElementById('textoConfirmacion').innerText = mensaje + " Se guardará en la cola de espera.";
     
-    // Abrir ventana de impresión ANTES de ocultar el modal (crucial en móvil)
+    // Cambiado: ya no se abre printWindow aquí
     document.getElementById('btnConfirmarAccion').onclick = async function() {
-        if (accionPendiente === 'imprimir_descargar') {
-            printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                mostrarToast('⚠️ Permite las ventanas emergentes para imprimir la cotización.');
-                printWindow = null;
-            }
-        }
         modalConfirmacionInst.hide();
         await prepararDatosParaAccion();
     };
@@ -428,6 +421,23 @@ function solicitarConfirmacion(tipo) {
 
 async function prepararDatosParaAccion() {
     if(usuarioActual && currentUser) {
+        // Solo para usuarios logueados: abrir ventana aquí (sincrónico al clic de confirmación)
+        if (accionPendiente === 'imprimir_descargar') {
+            printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                mostrarToast('⚠️ Permite las ventanas emergentes para imprimir la cotización.');
+                printWindow = null;
+            } else {
+                printWindow.document.write(`
+                  <html><head><title>Cargando...</title></head>
+                  <body style="font-family:Arial;text-align:center;margin-top:100px;">
+                    <h2>Cargando cotización...</h2>
+                    <p>Por favor espera unos segundos.</p>
+                  </body></html>
+                `);
+                printWindow.document.close();
+            }
+        }
         await ejecutarAccionConDatos(currentUser);
     } else {
         modalDatosInvitadoInst.show();
@@ -441,9 +451,29 @@ async function confirmarDatosInvitado() {
 
   if (!nombre || !apellido || !telefono) return mostrarToast('Completa los campos');
 
-  invitadoTemp = { nombre, apellido, telefono };
+  const clienteData = { nombre, apellido, telefono };
+
   modalDatosInvitadoInst.hide();
-  await ejecutarAccionConDatos(invitadoTemp);
+
+  // Para invitados: abrir ventana aquí (sincrónico al clic del invitado)
+  if (accionPendiente === 'imprimir_descargar') {
+    printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      mostrarToast('⚠️ Permite las ventanas emergentes para imprimir la cotización.');
+      printWindow = null;
+    } else {
+      printWindow.document.write(`
+        <html><head><title>Cargando...</title></head>
+        <body style="font-family:Arial;text-align:center;margin-top:100px;">
+          <h2>Cargando cotización...</h2>
+          <p>Por favor espera unos segundos.</p>
+        </body></html>
+      `);
+      printWindow.document.close();
+    }
+  }
+
+  await ejecutarAccionConDatos(clienteData);
 }
 
 async function ejecutarAccionConDatos(clienteData) {
@@ -484,7 +514,7 @@ async function ejecutarAccionConDatos(clienteData) {
   }
 
   limpiarCarrito();
-  cargarCarrito(); // Actualiza inmediatamente la vista del carrito (incluso si está vacío)
+  cargarCarrito();
   actualizarContadorCarrito();
   invitadoTemp = null;
   accionPendiente = null;
@@ -498,10 +528,12 @@ function enviarPorWhatsApp(pedido, turno) {
   });
   mensaje += `\nTotal: ${formatearRD(pedido.total)}`;
   const url = `https://wa.me/18096659100?text=${encodeURIComponent(mensaje)}`;
-  window.open(url, '_blank');
+  
+  // Redirección directa: funciona perfectamente en móvil
+  location.href = url;
 }
 
-// ================= FUNCIÓN UNIFICADA DE IMPRESIÓN (actualizada: SIN impresión automática, botones manuales) =================
+// ================= FUNCIÓN UNIFICADA DE IMPRESIÓN =================
 function imprimirFactura(pedido, turno, targetWin = null) {
     let win = targetWin || window.open('', '_blank');
     if (!win) {
@@ -533,9 +565,7 @@ function imprimirFactura(pedido, turno, targetWin = null) {
     <head>
       <title>Factura #${pedido.id}</title>
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <!-- Bootstrap para botones bonitos -->
       <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-      <!-- html2pdf.js para descargar PDF -->
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
       <style>
         body { font-family: Arial, sans-serif; color: #333; padding: 20px; }
@@ -548,14 +578,12 @@ function imprimirFactura(pedido, turno, targetWin = null) {
       </style>
     </head>
     <body>
-        <!-- Tres botones manuales (no se imprimen ni descargan en PDF) -->
         <div class="no-print d-flex flex-wrap justify-content-center gap-3 my-4">
             <button class="btn btn-danger px-5 py-3 fs-5" onclick="window.close()">Cerrar Ventana</button>
             <button class="btn btn-primary px-5 py-3 fs-5" onclick="window.print()">Imprimir</button>
             <button class="btn btn-success px-5 py-3 fs-5" onclick="descargarPDF()">Descargar PDF</button>
         </div>
 
-        <!-- Contenido de la factura -->
         <div id="facturaContent">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6a1b9a; padding-bottom:20px; margin-bottom:30px;">
                 <div style="text-align: left;">
@@ -615,7 +643,6 @@ function imprimirFactura(pedido, turno, targetWin = null) {
         </div>
 
         <script>
-            // Función descargar PDF (solo el contenido de la factura)
             function descargarPDF() {
                 const element = document.getElementById('facturaContent');
                 let filename = 'Cotizacion-${pedido.id}.pdf';
@@ -632,7 +659,6 @@ function imprimirFactura(pedido, turno, targetWin = null) {
                 html2pdf().set(opt).from(element).save();
             }
 
-            // Cierre automático SOLO después de imprimir
             window.onafterprint = function() { 
                 window.close(); 
             };
@@ -644,24 +670,11 @@ function imprimirFactura(pedido, turno, targetWin = null) {
                     }
                 });
             }
-
-            // REMOVIDO: No hay impresión automática → el usuario decide con el botón
         </script>
     </body>
     </html>`);
     win.document.close();
 }
-
-// En la función reimprimirPedidoDesdeModal (actualizar para manejar turno correctamente)
-function reimprimirPedidoDesdeModal() { 
-    if(pedidoActualParaImprimir) {
-        let turno = (pedidoActualParaImprimir.estado === 'pendiente') 
-            ? calcularTurnoActualDePedido(pedidoActualParaImprimir.id) 
-            : null;
-        imprimirFactura(pedidoActualParaImprimir, turno);
-    }
-}
-
 
 // ================= ADMIN LOGIC =================
 async function actualizarBadgeColaAdmin() {
@@ -1000,7 +1013,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   modalCategoriaInst = new bootstrap.Modal(document.getElementById('modalCategoria'));
   modalProductoInst = new bootstrap.Modal(document.getElementById('modalProducto'));
   
-  // Modales críticos en móvil: no se cierran tocando fuera ni con Esc
   modalDatosInvitadoInst = new bootstrap.Modal(document.getElementById('modalDatosInvitado'), {backdrop: 'static', keyboard: false});
   modalConfirmacionInst = new bootstrap.Modal(document.getElementById('modalConfirmacion'), {backdrop: 'static', keyboard: false});
   
@@ -1021,5 +1033,3 @@ document.addEventListener('DOMContentLoaded', async () => {
   actualizarInterfaz();
   irASeccion('portada');
 });
-
-
