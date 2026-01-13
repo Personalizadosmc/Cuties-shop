@@ -411,7 +411,6 @@ function solicitarConfirmacion(tipo) {
     
     document.getElementById('textoConfirmacion').innerText = mensaje + " Se guardará en la cola de espera.";
     
-    // Cambiado: ya no se abre printWindow aquí
     document.getElementById('btnConfirmarAccion').onclick = async function() {
         modalConfirmacionInst.hide();
         await prepararDatosParaAccion();
@@ -419,31 +418,28 @@ function solicitarConfirmacion(tipo) {
     modalConfirmacionInst.show();
 }
 
+// CORREGIDO: Evitar apertura prematura de ventana para invitados
 async function prepararDatosParaAccion() {
-    if(usuarioActual && currentUser) {
-        // Solo para usuarios logueados: abrir ventana aquí (sincrónico al clic de confirmación)
+    if(usuarioActual && currentUser && currentUser.role) {
+        // Lógica usuarios registrados
         if (accionPendiente === 'imprimir_descargar') {
             printWindow = window.open('', '_blank');
             if (!printWindow) {
-                mostrarToast('⚠️ Permite las ventanas emergentes para imprimir la cotización.');
+                mostrarToast('⚠️ Permite las ventanas emergentes para imprimir.');
                 printWindow = null;
             } else {
-                printWindow.document.write(`
-                  <html><head><title>Cargando...</title></head>
-                  <body style="font-family:Arial;text-align:center;margin-top:100px;">
-                    <h2>Cargando cotización...</h2>
-                    <p>Por favor espera unos segundos.</p>
-                  </body></html>
-                `);
-                printWindow.document.close();
+                printWindow.document.write('<h3 style="font-family:sans-serif;text-align:center;margin-top:50px;">Generando factura...</h3>');
             }
         }
         await ejecutarAccionConDatos(currentUser);
     } else {
+        // Lógica invitado: NO abrir ventana todavía
+        printWindow = null; 
         modalDatosInvitadoInst.show();
     }
 }
 
+// CORREGIDO: Abrir ventana SOLO tras confirmar en el modal
 async function confirmarDatosInvitado() {
   const nombre = document.getElementById('invNombre').value.trim();
   const apellido = document.getElementById('invApellido').value.trim();
@@ -451,28 +447,19 @@ async function confirmarDatosInvitado() {
 
   if (!nombre || !apellido || !telefono) return mostrarToast('Completa los campos');
 
-  const clienteData = { nombre, apellido, telefono };
-
   modalDatosInvitadoInst.hide();
 
-  // Para invitados: abrir ventana aquí (sincrónico al clic del invitado)
+  // Abrimos la ventana AQUÍ para evitar bloqueos y pantallas blancas
   if (accionPendiente === 'imprimir_descargar') {
     printWindow = window.open('', '_blank');
     if (!printWindow) {
       mostrarToast('⚠️ Permite las ventanas emergentes para imprimir la cotización.');
-      printWindow = null;
     } else {
-      printWindow.document.write(`
-        <html><head><title>Cargando...</title></head>
-        <body style="font-family:Arial;text-align:center;margin-top:100px;">
-          <h2>Cargando cotización...</h2>
-          <p>Por favor espera unos segundos.</p>
-        </body></html>
-      `);
-      printWindow.document.close();
+      printWindow.document.write('<h3 style="font-family:sans-serif;text-align:center;margin-top:50px;">Generando factura para invitado...</h3>');
     }
   }
 
+  const clienteData = { nombre, apellido, telefono };
   await ejecutarAccionConDatos(clienteData);
 }
 
@@ -507,7 +494,8 @@ async function ejecutarAccionConDatos(clienteData) {
       if (printWindow) {
           imprimirFactura(newPedido, turno, printWindow);
       } else {
-          mostrarToast('Impresión bloqueada, pero el pedido se guardó en la cola.');
+          // Si por alguna razón printWindow se perdió, intentamos una última vez (aunque el navegador podría bloquearlo)
+          imprimirFactura(newPedido, turno);
       }
   } else if (accionPendiente === 'whatsapp') {
       enviarPorWhatsApp(newPedido, turno);
@@ -528,8 +516,6 @@ function enviarPorWhatsApp(pedido, turno) {
   });
   mensaje += `\nTotal: ${formatearRD(pedido.total)}`;
   const url = `https://wa.me/18096659100?text=${encodeURIComponent(mensaje)}`;
-  
-  // Redirección directa: funciona perfectamente en móvil
   location.href = url;
 }
 
@@ -724,6 +710,7 @@ async function cargarProductosAdmin() {
   });
 }
 
+// CORREGIDO: Se agregaron los botones de imprimir en la lista de pendientes y completados
 async function cargarPedidosAdmin() {
   historialPedidos = await loadPedidos();
   const containerPendientes = document.getElementById('listaPedidosPendientes'); 
@@ -739,6 +726,7 @@ async function cargarPedidosAdmin() {
   } else {
       pendientes.forEach((pedido, index) => {
           let turnoVisual = index + 1;
+          // BOTÓN IMPRIMIR AGREGADO AQUÍ
           containerPendientes.innerHTML += `
             <tr class="table-warning">
                 <td class="align-middle"><span class="turno-badge">#${turnoVisual}</span></td>
@@ -749,6 +737,7 @@ async function cargarPedidosAdmin() {
                 <td class="align-middle small">${pedido.fecha}</td>
                 <td class="align-middle fw-bold">${formatearRD(pedido.total)}</td>
                 <td class="text-end align-middle">
+                    <button class="btn btn-sm btn-secondary me-1" onclick="imprimirCopiaAdmin(${pedido.id})" title="Imprimir Copia"><i class="bi bi-printer"></i></button>
                     <button class="btn btn-sm btn-info text-white me-1" onclick='verDetallePedido(${JSON.stringify(pedido)})' title="Ver"><i class="bi bi-eye-fill"></i></button>
                     <button class="btn btn-sm btn-success fw-bold" onclick='marcarPedidoCompletado(${pedido.id})' title="Marcar como Realizado"><i class="bi bi-check-lg"></i> Listo</button>
                 </td>
@@ -760,6 +749,7 @@ async function cargarPedidosAdmin() {
       containerCompletados.innerHTML = '<tr><td colspan="5" class="text-center py-2">Sin historial reciente.</td></tr>';
   } else {
       completados.forEach((pedido) => {
+          // BOTÓN IMPRIMIR AGREGADO AQUÍ
           containerCompletados.innerHTML += `
             <tr>
                 <td><small>#${pedido.id}</small></td>
@@ -768,12 +758,25 @@ async function cargarPedidosAdmin() {
                 <td>${formatearRD(pedido.total)}</td>
                 <td class="text-end">
                      <span class="badge bg-success">Completado</span>
+                     <button class="btn btn-sm btn-secondary me-1" onclick="imprimirCopiaAdmin(${pedido.id})" title="Imprimir Copia"><i class="bi bi-printer"></i></button>
                      <button class="btn btn-sm btn-light border" onclick='verDetallePedido(${JSON.stringify(pedido)})'><i class="bi bi-eye"></i></button>
                 </td>
             </tr>`;
       });
   }
   await actualizarBadgeColaAdmin();
+}
+
+// NUEVA FUNCIÓN: Permite al admin imprimir una copia antigua
+function imprimirCopiaAdmin(idPedido) {
+    const pedido = historialPedidos.find(p => p.id === idPedido);
+    if (!pedido) return mostrarToast('Error: Pedido no encontrado');
+    
+    // Calculamos el turno si está pendiente, o mostramos guión si ya se completó
+    let turno = calcularTurnoActualDePedido(pedido.id);
+    if (pedido.estado !== 'pendiente') turno = '-';
+
+    imprimirFactura(pedido, turno);
 }
 
 async function marcarPedidoCompletado(id) {
