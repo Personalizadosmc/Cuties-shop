@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="styles.css">
   
   <link rel="icon" type="image/png" href="Logo.PNG">
+  <link rel="apple-touch-icon" href="Logo.PNG">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -44,8 +45,7 @@
     </div>
 
     <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav me-auto mb-2 mb-lg-0 text-center text-lg-start" id="categoriaMenu">
-        </ul>
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0 text-center text-lg-start" id="categoriaMenu"></ul>
       
       <hr class="d-lg-none text-white-50">
 
@@ -200,7 +200,6 @@
   <div id="carrito" class="seccion">
     <div class="card p-3 p-md-4 border-0 shadow-sm rounded-4">
       <h3 class="mb-4 text-primary fw-bold"><i class="bi bi-cart4 me-2"></i>Tu Carrito</h3>
-      
       <div class="table-responsive mb-4 rounded-3 border">
         <table class="table align-middle table-hover mb-0">
           <thead class="bg-light">
@@ -222,7 +221,6 @@
           </tfoot>
         </table>
       </div>
-
       <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
         <button class="btn btn-outline-danger rounded-pill" onclick="vaciarCarrito()">
             <i class="bi bi-trash"></i> Vaciar
@@ -320,51 +318,36 @@
             <div class="col-md-5 text-center text-md-start">
                 <div class="d-flex align-items-center justify-content-center justify-content-md-start mb-3">
                      <img src="Logo.PNG" alt="Logo" class="bg-white rounded-circle p-1 me-2" style="width: 50px; height: 50px;">
-                     <h4 class="fw-bold m-0">Mariposas Cuties</h4>
+                     <h4 class="fw-bold m-0 text-white">Mariposas Cuties</h4>
                 </div>
-                <p class="small text-white-50">
+                <p class="text-white fw-bold">
                     Somos una empresa encargada de vender productos totalmente personalizados, diseñados con amor para tus momentos especiales.
                 </p>
-                <div class="d-inline-block bg-white bg-opacity-10 px-3 py-1 rounded-pill border border-white border-opacity-25 mt-2">
+                <div id="footerVisitasContainer" class="d-none d-inline-block bg-white bg-opacity-10 px-3 py-1 rounded-pill border border-white border-opacity-25 mt-2">
                     <small>
-                        <i class="bi bi-calendar-check me-1"></i> Visitas Hoy: 
-                        <span id="contador-visitas" class="fw-bold">...</span>
+                        <i class="bi bi-calendar-check me-1 text-white"></i> <span class="text-white fw-bold">Visitas Hoy:</span> 
+                        <span id="contador-visitas" class="fw-bold text-white">...</span>
                     </small>
                 </div>
             </div>
 
             <div class="col-md-3 text-center text-md-start">
-                <h5 class="fw-bold border-bottom border-light pb-2 d-inline-block">Síguenos</h5>
+                <h5 class="fw-bold border-bottom border-light pb-2 d-inline-block text-white">Síguenos</h5>
                 <ul class="list-unstyled mt-2">
-                    <li class="mb-2">
-                        <a href="https://instagram.com" target="_blank" class="text-white text-decoration-none">
-                            <i class="bi bi-instagram me-2 fs-5"></i> Instagram
-                        </a>
-                    </li>
-                    <li>
-                         <a href="https://facebook.com" target="_blank" class="text-white text-decoration-none">
-                            <i class="bi bi-facebook me-2 fs-5"></i> Facebook
-                        </a>
-                    </li>
+                    <li class="mb-2"><a href="https://instagram.com" target="_blank" class="text-white text-decoration-none fw-bold"><i class="bi bi-instagram me-2 fs-5"></i> Instagram</a></li>
+                    <li><a href="https://facebook.com" target="_blank" class="text-white text-decoration-none fw-bold"><i class="bi bi-facebook me-2 fs-5"></i> Facebook</a></li>
                 </ul>
             </div>
 
             <div class="col-md-4 text-center text-md-start">
-                <h5 class="fw-bold border-bottom border-light pb-2 d-inline-block">Ubicación</h5>
-                <p class="small text-white-50 mt-2 mb-2">
-                    <i class="bi bi-geo-alt-fill text-warning me-1"></i> 
-                    Salcedo - Tenares, Rep. Dom.
-                </p>
-                <a href="https://maps.google.com" target="_blank" class="btn btn-outline-light btn-sm rounded-pill w-100 mb-2">
-                    <i class="bi bi-map-fill me-2"></i> Ver en Mapa
-                </a>
-                <p class="small text-white-50">
-                    <i class="bi bi-whatsapp text-success me-1"></i> 809-665-9100
-                </p>
+                <h5 class="fw-bold border-bottom border-light pb-2 d-inline-block text-white">Ubicación</h5>
+                <p class="text-white fw-bold mt-2 mb-2"><i class="bi bi-geo-alt-fill text-warning me-1"></i> Salcedo - Tenares, Rep. Dom.</p>
+                <a href="https://maps.google.com" target="_blank" class="btn btn-outline-light btn-sm rounded-pill w-100 mb-2 fw-bold"><i class="bi bi-map-fill me-2"></i> Ver en Mapa</a>
+                <p class="text-white fw-bold"><i class="bi bi-whatsapp text-success me-1"></i> 809-665-9100</p>
             </div>
         </div>
         <hr class="border-white opacity-25 my-4">
-        <div class="text-center small text-white-50">
+        <div class="text-center text-white fw-bold">
             © 2026 Mariposas Cuties. Todos los derechos reservados.
         </div>
     </div>
@@ -379,149 +362,13 @@
     <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light cartCountNav" style="font-size: 0.7rem;">0</span>
 </button>
 
-<div class="modal fade" id="modalProductoDetalle" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered modal-lg"> 
-    <div class="modal-content border-0 rounded-4 overflow-hidden">
-      <div class="row g-0">
-          <div class="col-md-6 bg-light d-flex align-items-center justify-content-center p-3">
-             <img src="" id="detalleImg" class="img-fluid rounded-3 shadow-sm" style="max-height: 350px;">
-          </div>
-          <div class="col-md-6">
-              <div class="modal-header border-0 pb-0">
-                  <span class="badge bg-primary-subtle text-primary rounded-pill px-3" id="detalleCat">Categoría</span>
-                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-              </div>
-              <div class="modal-body p-4">
-                  <h3 class="fw-bold mb-2" id="detalleNombre">Nombre Producto</h3>
-                  <h2 class="text-primary fw-bold mb-3" id="detallePrecio">RD$ 0.00</h2>
-                  <div id="detalleEstado" class="mb-3"></div>
-                  <p class="text-muted" id="detalleDesc">Descripción...</p>
-              </div>
-              <div class="modal-footer border-0 p-4 pt-0">
-                  <button type="button" class="btn btn-primary w-100 py-2 rounded-pill shadow-sm" id="btnAgregarDetalle">
-                      Agregar al Carrito
-                  </button>
-              </div>
-          </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="modalDatosInvitado" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content rounded-4 border-0">
-      <div class="modal-header border-0">
-        <h5 class="modal-title fw-bold">Datos para el Pedido</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <p class="text-muted small mb-3">Necesitamos estos datos para identificar tu orden en la fila.</p>
-        <form id="formInvitado">
-            <div class="form-floating mb-2">
-                <input type="text" class="form-control rounded-3" id="invNombre" placeholder="Nombre" required>
-                <label>Nombre</label>
-            </div>
-            <div class="form-floating mb-2">
-                <input type="text" class="form-control rounded-3" id="invApellido" placeholder="Apellido" required>
-                <label>Apellido</label>
-            </div>
-            <div class="form-floating mb-2">
-                <input type="tel" class="form-control rounded-3" id="invTelefono" placeholder="Teléfono" required>
-                <label>Teléfono / Celular</label>
-            </div>
-        </form>
-      </div>
-      <div class="modal-footer border-0">
-        <button type="button" class="btn btn-primary w-100 rounded-pill" onclick="confirmarDatosInvitado()">Confirmar Pedido</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="modalConfirmacion" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content rounded-4 border-0">
-      <div class="modal-body text-center p-4">
-        <i class="bi bi-question-circle-fill text-warning display-1 mb-3"></i>
-        <h4 class="fw-bold">¿Estás seguro?</h4>
-        <p class="text-muted" id="textoConfirmacion">...</p>
-        <div class="d-flex justify-content-center gap-2 mt-4">
-            <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
-            <button type="button" class="btn btn-primary rounded-pill px-4" id="btnConfirmarAccion">Sí, confirmar</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="modalExitoOrden" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content rounded-4 border-0">
-      <div class="modal-body text-center p-5">
-        <div class="mb-3 text-success animate-pulse">
-            <i class="bi bi-check-circle-fill display-1"></i>
-        </div>
-        <h2 class="fw-bold text-success">¡Pedido Recibido!</h2>
-        <p class="lead text-dark">Tu número de turno es:</p>
-        <div class="display-3 fw-bold text-primary my-3 p-3 bg-light rounded-3 border border-primary border-dashed" id="numeroTurnoExito">#0</div>
-        
-        <div id="containerBtnWhatsappManual" class="d-none mt-3">
-             <p class="text-muted small">Si no se abrió WhatsApp automáticamente:</p>
-             <a href="#" id="btnWhatsappManual" target="_blank" class="btn btn-success rounded-pill w-100 py-2">
-                <i class="bi bi-whatsapp me-2"></i> Enviar Pedido Ahora
-             </a>
-        </div>
-
-        <button type="button" class="btn btn-outline-dark rounded-pill mt-4 px-5" data-bs-dismiss="modal" onclick="vaciarCarrito()">Cerrar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="modalCategoria" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content rounded-4">
-      <div class="modal-header"><h5 class="modal-title">Gestión Categoría</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-      <div class="modal-body">
-          <input type="hidden" id="catId">
-          <div class="mb-3"><label>Nombre</label><input type="text" class="form-control" id="catNombre"></div>
-          <div class="mb-3"><label>URL Imagen</label><input type="text" class="form-control" id="catImg"></div>
-          <button class="btn btn-primary w-100 rounded-pill" onclick="guardarCategoria()">Guardar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="modalProducto" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content rounded-4">
-      <div class="modal-header"><h5 class="modal-title">Gestión Producto</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-      <div class="modal-body">
-          <input type="hidden" id="prodId">
-          <div class="mb-2"><label>Categoría</label><select class="form-select" id="prodCatId"></select></div>
-          <div class="mb-2"><label>Nombre</label><input type="text" class="form-control" id="prodNombre"></div>
-          <div class="mb-2"><label>Precio</label><input type="number" class="form-control" id="prodPrecio"></div>
-          <div class="mb-2"><label>URL Imagen</label><input type="text" class="form-control" id="prodImg"></div>
-          <div class="mb-2"><label>Descripción</label><textarea class="form-control" id="prodDesc" rows="2"></textarea></div>
-          <div class="form-check mb-3">
-              <input class="form-check-input" type="checkbox" id="prodDisponible" checked>
-              <label class="form-check-label">Disponible</label>
-          </div>
-          <button class="btn btn-primary w-100 rounded-pill" onclick="guardarProducto()">Guardar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="toast-container position-fixed bottom-0 end-0 p-3">
-  <div id="liveToast" class="toast align-items-center text-bg-dark border-0 rounded-pill" role="alert" aria-live="assertive" aria-atomic="true">
-    <div class="d-flex">
-      <div class="toast-body px-4" id="toastBody">Notificación</div>
-      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-    </div>
-  </div>
-</div>
+<div class="modal fade" id="modalProductoDetalle" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content border-0 rounded-4 overflow-hidden"><div class="row g-0"><div class="col-md-6 bg-light d-flex align-items-center justify-content-center p-3"><img src="" id="detalleImg" class="img-fluid rounded-3 shadow-sm" style="max-height: 350px;"></div><div class="col-md-6"><div class="modal-header border-0 pb-0"><span class="badge bg-primary-subtle text-primary rounded-pill px-3" id="detalleCat">Categoría</span><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body p-4"><h3 class="fw-bold mb-2" id="detalleNombre">Nombre Producto</h3><h2 class="text-primary fw-bold mb-3" id="detallePrecio">RD$ 0.00</h2><div id="detalleEstado" class="mb-3"></div><p class="text-muted" id="detalleDesc">Descripción...</p></div><div class="modal-footer border-0 p-4 pt-0"><button type="button" class="btn btn-primary w-100 py-2 rounded-pill shadow-sm" id="btnAgregarDetalle">Agregar al Carrito</button></div></div></div></div></div></div>
+<div class="modal fade" id="modalDatosInvitado" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content rounded-4 border-0"><div class="modal-header border-0"><h5 class="modal-title fw-bold">Datos para el Pedido</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p class="text-muted small mb-3">Necesitamos estos datos para identificar tu orden en la fila.</p><form id="formInvitado"><div class="form-floating mb-2"><input type="text" class="form-control rounded-3" id="invNombre" placeholder="Nombre" required><label>Nombre</label></div><div class="form-floating mb-2"><input type="text" class="form-control rounded-3" id="invApellido" placeholder="Apellido" required><label>Apellido</label></div><div class="form-floating mb-2"><input type="tel" class="form-control rounded-3" id="invTelefono" placeholder="Teléfono" required><label>Teléfono / Celular</label></div></form></div><div class="modal-footer border-0"><button type="button" class="btn btn-primary w-100 rounded-pill" onclick="confirmarDatosInvitado()">Confirmar Pedido</button></div></div></div></div>
+<div class="modal fade" id="modalConfirmacion" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content rounded-4 border-0"><div class="modal-body text-center p-4"><i class="bi bi-question-circle-fill text-warning display-1 mb-3"></i><h4 class="fw-bold">¿Estás seguro?</h4><p class="text-muted" id="textoConfirmacion">...</p><div class="d-flex justify-content-center gap-2 mt-4"><button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary rounded-pill px-4" id="btnConfirmarAccion">Sí, confirmar</button></div></div></div></div></div>
+<div class="modal fade" id="modalExitoOrden" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content rounded-4 border-0"><div class="modal-body text-center p-5"><div class="mb-3 text-success animate-pulse"><i class="bi bi-check-circle-fill display-1"></i></div><h2 class="fw-bold text-success">¡Pedido Recibido!</h2><p class="lead text-dark">Tu número de turno es:</p><div class="display-3 fw-bold text-primary my-3 p-3 bg-light rounded-3 border border-primary border-dashed" id="numeroTurnoExito">#0</div><div id="containerBtnWhatsappManual" class="d-none mt-3"><p class="text-muted small">Si no se abrió WhatsApp automáticamente:</p><a href="#" id="btnWhatsappManual" target="_blank" class="btn btn-success rounded-pill w-100 py-2"><i class="bi bi-whatsapp me-2"></i> Enviar Pedido Ahora</a></div><button type="button" class="btn btn-outline-dark rounded-pill mt-4 px-5" data-bs-dismiss="modal" onclick="vaciarCarrito()">Cerrar</button></div></div></div></div>
+<div class="modal fade" id="modalCategoria" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content rounded-4"><div class="modal-header"><h5 class="modal-title">Gestión Categoría</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" id="catId"><div class="mb-3"><label>Nombre</label><input type="text" class="form-control" id="catNombre"></div><div class="mb-3"><label>URL Imagen</label><input type="text" class="form-control" id="catImg"></div><button class="btn btn-primary w-100 rounded-pill" onclick="guardarCategoria()">Guardar</button></div></div></div></div>
+<div class="modal fade" id="modalProducto" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content rounded-4"><div class="modal-header"><h5 class="modal-title">Gestión Producto</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" id="prodId"><div class="mb-2"><label>Categoría</label><select class="form-select" id="prodCatId"></select></div><div class="mb-2"><label>Nombre</label><input type="text" class="form-control" id="prodNombre"></div><div class="mb-2"><label>Precio</label><input type="number" class="form-control" id="prodPrecio"></div><div class="mb-2"><label>URL Imagen</label><input type="text" class="form-control" id="prodImg"></div><div class="mb-2"><label>Descripción</label><textarea class="form-control" id="prodDesc" rows="2"></textarea></div><div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="prodDisponible" checked><label class="form-check-label">Disponible</label></div><button class="btn btn-primary w-100 rounded-pill" onclick="guardarProducto()">Guardar</button></div></div></div></div>
+<div class="toast-container position-fixed bottom-0 end-0 p-3"><div id="liveToast" class="toast align-items-center text-bg-dark border-0 rounded-pill" role="alert" aria-live="assertive" aria-atomic="true"><div class="d-flex"><div class="toast-body px-4" id="toastBody">Notificación</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="script.js"></script>
