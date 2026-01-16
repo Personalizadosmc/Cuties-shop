@@ -11,7 +11,6 @@
   <link rel="stylesheet" href="styles.css">
   
   <link rel="icon" type="image/png" href="Logo.PNG">
-  <link rel="apple-touch-icon" href="Logo.PNG">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -36,7 +35,8 @@
     </a>
 
     <button class="btn btn-link nav-link position-relative order-lg-last ms-2" onclick="irASeccion('carrito')" id="btnCarrito">
-        <div class="icon-circle-bg bg-white text-primary"> <i class="bi bi-cart-fill fs-5"></i>
+        <div class="icon-circle-bg bg-white text-primary">
+            <i class="bi bi-cart-fill fs-5"></i>
         </div>
         <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark border border-light shadow-sm" id="cartCount">0</span>
     </button>
@@ -54,7 +54,7 @@
           </div>
 
           <button class="btn btn-warning btn-sm d-none shadow-sm rounded-pill px-3" onclick="irASeccion('adminPanel')" id="btnAdminNav">
-            <i class="bi bi-gear-fill"></i> Admin
+            <i class="bi bi-gear-fill"></i> Admin Panel
           </button>
 
           <div id="userDropdownContainer" class="d-none">
@@ -91,8 +91,7 @@
 
     <h3 class="mb-3 fw-bold ps-2 border-start border-4 border-primary">Explorar Categorías</h3>
     <div id="contenedorCategorias">
-        <div class="row g-3 g-md-4" id="listaCategorias">
-            </div>
+        <div class="row g-3 g-md-4" id="listaCategorias"></div>
     </div>
 
     <div id="contenedorResultados" class="d-none">
@@ -194,8 +193,7 @@
             <i class="bi bi-arrow-left me-1"></i> Atrás
         </button>
     </div>
-    <div class="row g-3" id="listaProductos">
-        </div>
+    <div class="row g-3" id="listaProductos"></div>
   </div>
 
   <div id="carrito" class="seccion">
@@ -292,9 +290,17 @@
 
         <div class="tab-pane fade" id="adminPedidos">
            <div class="d-flex justify-content-between align-items-center mb-3">
-               <h5 class="mb-0">Cola de Pedidos</h5>
-               <button class="btn btn-sm btn-outline-primary rounded-pill" onclick="cargarPedidosAdmin()"><i class="bi bi-arrow-clockwise"></i> Refrescar</button>
+               <h5 class="mb-0 text-primary fw-bold">Cola de Producción</h5>
+               <div>
+                   <button class="btn btn-sm btn-outline-danger rounded-pill me-1" onclick="confirmarBorrarTodo()">
+                       <i class="bi bi-trash3-fill"></i> Borrar Todo
+                   </button>
+                   <button class="btn btn-sm btn-outline-primary rounded-pill" onclick="cargarPedidosAdmin()">
+                       <i class="bi bi-arrow-clockwise"></i> Refrescar
+                   </button>
+               </div>
            </div>
+           
            <div class="row g-3" id="listaPedidosAdmin"></div>
         </div>
       </div>
@@ -347,20 +353,18 @@
                     <i class="bi bi-map-fill me-2"></i> Ver en Mapa
                 </a>
                 <p class="small text-white-50">
-                    <i class="bi bi-whatsapp text-success me-1"></i> 809-000-0000
+                    <i class="bi bi-whatsapp text-success me-1"></i> 809-665-9100
                 </p>
             </div>
         </div>
-
         <hr class="border-white opacity-25 my-4">
-
         <div class="text-center small text-white-50">
-            &copy; 2026 Mariposas Cuties. Todos los derechos reservados.
+            © 2026 Mariposas Cuties. Todos los derechos reservados.
         </div>
     </div>
 </footer>
 
-<a href="https://wa.me/18090000000" class="btn-whatsapp-float shadow-lg" target="_blank" title="Contáctanos por WhatsApp">
+<a href="https://wa.me/18096659100" class="btn-whatsapp-float shadow-lg" target="_blank" title="Contáctanos por WhatsApp">
     <i class="bi bi-whatsapp"></i>
 </a>
 
