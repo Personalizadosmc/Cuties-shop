@@ -10,91 +10,56 @@ let categorias = [];
 let historialPedidos = [];
 let currentUser = null;
 let usuarioActual = localStorage.getItem('usuarioActual') || null;
-let invitadoTemp = null; 
 let accionPendiente = null; 
 let printWindow = null; 
 
 // Instancias de Bootstrap
-let toastBootstrap, modalCategoriaInst, modalProductoInst, modalDatosInvitadoInst, modalDetallePedidoInst, modalConfirmacionInst, modalExitoOrdenInst, modalDetalleInst;
+let toastBootstrap, modalCategoriaInst, modalProductoInst, modalDatosInvitadoInst, modalConfirmacionInst, modalExitoOrdenInst, modalDetalleInst;
 
 function formatearRD(monto) {
   return 'RD$ ' + monto.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
-// ================= INICIALIZACIÓN (DOM READY) =================
+// ================= INICIALIZACIÓN =================
 document.addEventListener('DOMContentLoaded', async () => {
-  // 1. Inicializar Modales
   inicializarComponentesBootstrap();
   
-  // 2. Verificar Sesión
   if (usuarioActual) {
     const { data } = await supabaseClient.from('usuarios').select('*').eq('username', usuarioActual).single();
     if (data) currentUser = data;
     else { localStorage.removeItem('usuarioActual'); usuarioActual = null; }
   }
   
-  // 3. Cargar Datos y UI
   await cargarCategoriaMenu();
   actualizarInterfaz();
   await irASeccion('portada');
-  
-  // 4. Contador de Visitas
   iniciarContadorVisitas();
   
-  // 5. Quitar Loader
   setTimeout(() => {
       const loader = document.getElementById('loader-overlay');
-      if(loader) {
-          loader.style.opacity = '0';
-          setTimeout(() => loader.remove(), 500);
-      }
+      if(loader) { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 500); }
   }, 800);
 });
 
 function inicializarComponentesBootstrap() {
   toastBootstrap = new bootstrap.Toast(document.getElementById('liveToast'));
-  
-  // Modales principales
   if(document.getElementById('modalCategoria')) modalCategoriaInst = new bootstrap.Modal(document.getElementById('modalCategoria'));
   if(document.getElementById('modalProducto')) modalProductoInst = new bootstrap.Modal(document.getElementById('modalProducto'));
   if(document.getElementById('modalDatosInvitado')) modalDatosInvitadoInst = new bootstrap.Modal(document.getElementById('modalDatosInvitado'), {backdrop: 'static', keyboard: false});
   if(document.getElementById('modalConfirmacion')) modalConfirmacionInst = new bootstrap.Modal(document.getElementById('modalConfirmacion'), {backdrop: 'static', keyboard: false});
   if(document.getElementById('modalExitoOrden')) modalExitoOrdenInst = new bootstrap.Modal(document.getElementById('modalExitoOrden'));
   if(document.getElementById('modalProductoDetalle')) modalDetalleInst = new bootstrap.Modal(document.getElementById('modalProductoDetalle'));
-
-  // Inyectar Modal Detalle Pedido (Admin) si falta
-  if (!document.getElementById('modalDetallePedido')) {
-      const modalHTML = `
-      <div class="modal fade" id="modalDetallePedido" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content rounded-4 border-0">
-            <div class="modal-header bg-light border-0"><h5 class="modal-title fw-bold">Detalle del Pedido</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body" id="cuerpoDetallePedido"></div>
-            <div class="modal-footer border-0"><button class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">Cerrar</button></div>
-          </div>
-        </div>
-      </div>`;
-      document.body.insertAdjacentHTML('beforeend', modalHTML);
-  }
-  modalDetallePedidoInst = new bootstrap.Modal(document.getElementById('modalDetallePedido'));
 }
 
-// ================= CONTADOR DE VISITAS =================
+// ================= VISITAS =================
 async function iniciarContadorVisitas() {
-    const contadorEls = document.querySelectorAll('#contador-visitas'); 
-    if (contadorEls.length === 0) return;
-
+    const els = document.querySelectorAll('#contador-visitas');
+    if (els.length === 0) return;
     try {
         await supabaseClient.from('visitas').insert({});
         const { count, error } = await supabaseClient.from('visitas').select('*', { count: 'exact', head: true });
-        
-        if (!error && count !== null) {
-            contadorEls.forEach(el => el.innerText = count.toLocaleString());
-        }
-    } catch (e) {
-        console.warn("Usando contador local.");
-        contadorEls.forEach(el => el.innerText = "1,245"); // Número simulado
-    }
+        if (!error && count !== null) els.forEach(el => el.innerText = count.toLocaleString());
+    } catch (e) { els.forEach(el => el.innerText = "1,200"); }
 }
 
 // ================= NAVEGACIÓN =================
@@ -103,73 +68,48 @@ async function irASeccion(seccion) {
   const activeSection = document.getElementById(seccion);
   if(activeSection) activeSection.classList.add('active');
 
-  if (seccion === 'portada') { 
-    await cargarCategorias(); 
-    limpiarBusqueda(); 
-  }
+  if (seccion === 'portada') { await cargarCategorias(); limpiarBusqueda(); }
   else if (seccion === 'carrito') { cargarCarrito(); } 
   else if (seccion === 'adminPanel') {
-    if (currentUser?.role !== 'admin') { 
-      mostrarToast('🚫 Acceso solo para administradores.'); 
-      irASeccion('portada'); 
-      return; 
-    }
+    if (currentUser?.role !== 'admin') { mostrarToast('🚫 Acceso denegado.'); irASeccion('portada'); return; }
     await cargarCategoriasAdmin();
+    await cargarPedidosAdmin();
     await actualizarBadgeColaAdmin();
   }
   
   window.scrollTo({top: 0, behavior: 'smooth'});
-
   const navBar = document.getElementById('navbarNav');
-  if (navBar && navBar.classList.contains('show')) {
-      bootstrap.Collapse.getInstance(navBar).hide();
-  }
+  if (navBar && navBar.classList.contains('show')) bootstrap.Collapse.getInstance(navBar).hide();
 }
 
 function actualizarInterfaz() {
-  const authBtnContainer = document.getElementById('authButtonsContainer');
-  const adminBtnNav = document.getElementById('btnAdminNav');
-  const userDropdownContainer = document.getElementById('userDropdownContainer');
-  const userNameNav = document.getElementById('userNameNav');
+  const authBtn = document.getElementById('authButtonsContainer');
+  const adminBtn = document.getElementById('btnAdminNav');
+  const userDrop = document.getElementById('userDropdownContainer');
   
   if (usuarioActual && currentUser) {
-    authBtnContainer.classList.add('d-none');
-    userNameNav.innerText = currentUser.nombre;
-    if (currentUser.role === 'admin') { 
-        adminBtnNav.classList.remove('d-none'); 
-        userDropdownContainer.classList.add('d-none');
-    } else { 
-        adminBtnNav.classList.add('d-none'); 
-        userDropdownContainer.classList.remove('d-none'); 
-    }
+    authBtn.classList.add('d-none');
+    document.getElementById('userNameNav').innerText = currentUser.nombre;
+    if (currentUser.role === 'admin') { adminBtn.classList.remove('d-none'); userDrop.classList.add('d-none'); } 
+    else { adminBtn.classList.add('d-none'); userDrop.classList.remove('d-none'); }
   } else {
-    authBtnContainer.classList.remove('d-none');
-    adminBtnNav.classList.add('d-none');
-    userDropdownContainer.classList.add('d-none');
+    authBtn.classList.remove('d-none'); adminBtn.classList.add('d-none'); userDrop.classList.add('d-none');
   }
   actualizarContadorCarrito();
 }
 
 function actualizarContadorCarrito() {
-  const carrito = getCarrito();
-  const total = carrito.reduce((sum, item) => sum + item.cantidad, 0);
-  const badge = document.getElementById('cartCount');
-  badge.innerText = total;
-  if(total > 0) {
-      badge.classList.remove('d-none');
-      badge.classList.add('animate-pulse');
-      setTimeout(() => badge.classList.remove('animate-pulse'), 500);
-  } else {
-      badge.classList.add('d-none');
-  }
+  const c = getCarrito();
+  const total = c.reduce((s, i) => s + i.cantidad, 0);
+  const b = document.getElementById('cartCount');
+  b.innerText = total;
+  if(total > 0) { b.classList.remove('d-none'); b.classList.add('animate-pulse'); setTimeout(() => b.classList.remove('animate-pulse'), 500); }
+  else b.classList.add('d-none');
 }
 
-function mostrarToast(mensaje) {
-  document.getElementById('toastBody').innerText = mensaje;
-  toastBootstrap.show();
-}
+function mostrarToast(msg) { document.getElementById('toastBody').innerText = msg; toastBootstrap.show(); }
 
-// ================= DATA LOADING =================
+// ================= DATOS (SUPABASE) =================
 async function loadCategories() {
   const { data: cats, error } = await supabaseClient.from('categorias').select('*');
   if (error) return [];
@@ -181,79 +121,57 @@ async function loadCategories() {
 }
 
 async function loadPedidos() {
-  const { data } = await supabaseClient.from('pedidos').select('*').order('id', { ascending: true });
-  return data ? data.map(formatPedido) : [];
-}
-
-function formatPedido(p) {
-  p.fecha = new Date(p.created_at).toLocaleString('es-DO', { timeZone: 'America/Santo_Domingo' });
-  return p;
+  const { data } = await supabaseClient.from('pedidos').select('*').order('created_at', { ascending: true }); // Ordenar por fecha para la cola FIFO
+  return data ? data.map(p => { 
+      p.fecha = new Date(p.created_at).toLocaleString('es-DO', { timeZone: 'America/Santo_Domingo' });
+      return p; 
+  }) : [];
 }
 
 // ================= AUTH =================
 async function registrarUsuario() {
-  const nombre = document.getElementById('regNombre').value.trim();
-  const apellido = document.getElementById('regApellido').value.trim();
-  const direccion = document.getElementById('regDireccion').value.trim();
-  const telefono = document.getElementById('regTelefono').value.trim();
-  const usuario = document.getElementById('regUser').value.trim();
-  const password = document.getElementById('regPass').value.trim();
-  const passwordConfirm = document.getElementById('regPassConfirm').value.trim();
+  const inputs = ['regNombre', 'regApellido', 'regDireccion', 'regTelefono', 'regUser', 'regPass', 'regPassConfirm'];
+  const val = {};
+  inputs.forEach(id => val[id] = document.getElementById(id).value.trim());
 
-  if (!nombre || !usuario || !password) return mostrarToast('Completa los campos obligatorios.');
-  if (password !== passwordConfirm) return mostrarToast('Las contraseñas no coinciden.');
+  if (!val.regNombre || !val.regUser || !val.regPass) return mostrarToast('Faltan datos obligatorios.');
+  if (val.regPass !== val.regPassConfirm) return mostrarToast('Las contraseñas no coinciden.');
 
   const { error } = await supabaseClient.from('usuarios').insert({
-    username: usuario, pass: password, nombre, apellido, direccion, telefono, role: 'user'
+    username: val.regUser, pass: val.regPass, nombre: val.regNombre, apellido: val.regApellido, direccion: val.regDireccion, telefono: val.regTelefono, role: 'user'
   });
 
-  if (error) return mostrarToast('Error: El usuario ya existe o hubo un fallo.');
-  mostrarToast('¡Registro exitoso! Ingresa ahora.');
-  irASeccion('login');
+  if (error) return mostrarToast('Error al registrar.');
+  mostrarToast('¡Cuenta creada!'); irASeccion('login');
 }
 
 async function iniciarSesion() {
-  const usuario = document.getElementById('loginUser').value.trim();
-  const password = document.getElementById('loginPass').value.trim();
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value.trim();
+  const { data, error } = await supabaseClient.from('usuarios').select('*').eq('username', u).single();
 
-  const { data, error } = await supabaseClient.from('usuarios').select('*').eq('username', usuario).single();
+  if (error || !data || data.pass !== p) return mostrarToast('Credenciales incorrectas.');
 
-  if (error || !data || data.pass !== password) return mostrarToast('Datos incorrectos.');
-
-  currentUser = data;
-  usuarioActual = usuario;
-  localStorage.setItem('usuarioActual', usuario);
-  actualizarInterfaz();
-  mostrarToast(`¡Bienvenido, ${currentUser.nombre}!`);
-  irASeccion('portada');
+  currentUser = data; usuarioActual = u; localStorage.setItem('usuarioActual', u);
+  actualizarInterfaz(); mostrarToast(`¡Hola, ${currentUser.nombre}!`); irASeccion('portada');
 }
 
 function cerrarSesion() {
-  usuarioActual = null;
-  currentUser = null;
-  localStorage.removeItem('usuarioActual');
-  actualizarInterfaz();
-  irASeccion('portada');
+  usuarioActual = null; currentUser = null; localStorage.removeItem('usuarioActual');
+  actualizarInterfaz(); irASeccion('portada');
 }
 
 // ================= TIENDA =================
 async function cargarCategorias() {
   categorias = await loadCategories();
-  const container = document.getElementById('listaCategorias');
-  container.innerHTML = '';
-  
-  if (categorias.length === 0) {
-      container.innerHTML = '<div class="text-center py-5 text-muted">Cargando catálogo...</div>';
-      return;
-  }
+  const c = document.getElementById('listaCategorias'); c.innerHTML = '';
+  if (categorias.length === 0) { c.innerHTML = '<div class="text-center py-5 text-muted">Cargando...</div>'; return; }
 
   categorias.forEach(cat => {
-    container.innerHTML += `
+    c.innerHTML += `
       <div class="col-6 col-md-3 mb-3">
           <div class="card card-categoria h-100" onclick="verProductos('${cat.nombre}')">
-              <div class="ratio-4x3">
-                 <img src="${cat.img}" alt="${cat.nombre}">
-              </div>
+              <div class="ratio-4x3"><img src="${cat.img}" alt="${cat.nombre}"></div>
               <div class="card-body text-center p-2 p-md-3">
                   <h6 class="card-title fw-bold text-dark m-0">${cat.nombre}</h6>
                   <small class="text-muted">${cat.productos.length} estilos</small>
@@ -265,39 +183,32 @@ async function cargarCategorias() {
 }
 
 async function cargarCategoriaMenu() {
-  const menu = document.getElementById('categoriaMenu');
-  if(!menu) return;
-  menu.innerHTML = '';
-  categorias.forEach(cat => {
-    menu.innerHTML += `<li class="nav-item"><a class="nav-link fw-bold" href="#" onclick="verProductos('${cat.nombre}')">${cat.nombre}</a></li>`;
-  });
+  const m = document.getElementById('categoriaMenu'); if(!m) return;
+  m.innerHTML = ''; categorias.forEach(cat => m.innerHTML += `<li class="nav-item"><a class="nav-link fw-bold" href="#" onclick="verProductos('${cat.nombre}')">${cat.nombre}</a></li>`);
 }
 
-function verProductos(nombreCategoria) {
-  const categoria = categorias.find(c => c.nombre === nombreCategoria);
-  if (categoria) mostrarProductosEnSeccion(categoria.nombre, categoria.productos);
+function verProductos(nom) {
+  const cat = categorias.find(c => c.nombre === nom);
+  if (cat) mostrarProductosEnSeccion(cat.nombre, cat.productos);
 }
 
-function mostrarProductosEnSeccion(titulo, productos) {
-  document.getElementById('tituloCategoria').innerText = titulo;
-  const container = document.getElementById('listaProductos');
-  container.innerHTML = '';
-  
-  const cat = categorias.find(c => c.nombre === titulo);
+function mostrarProductosEnSeccion(tit, prods) {
+  document.getElementById('tituloCategoria').innerText = tit;
+  const c = document.getElementById('listaProductos'); c.innerHTML = '';
+  const cat = categorias.find(x => x.nombre === tit);
 
-  if (productos.length === 0) {
-    container.innerHTML = '<div class="col-12 text-center text-muted py-5">Categoría vacía por el momento.</div>';
-  } else {
-    productos.forEach((prod) => {
-      let estadoBadge = prod.disponible ? '' : '<span class="position-absolute top-0 end-0 badge bg-danger m-2 shadow-sm">Agotado</span>';
-      container.innerHTML += `
+  if (prods.length === 0) { c.innerHTML = '<div class="col-12 text-center text-muted py-5">Sin productos.</div>'; } 
+  else {
+    prods.forEach(p => {
+      let badge = p.disponible ? '' : '<span class="position-absolute top-0 end-0 badge bg-danger m-2 shadow-sm">Agotado</span>';
+      c.innerHTML += `
           <div class="col-6 col-md-3 mb-3">
-              <div class="card card-producto h-100" onclick="abrirDetalleProducto(${cat.id}, ${prod.id})">
-                  ${estadoBadge}
-                  <div class="ratio-4x3"><img src="${prod.img}" alt="${prod.nombre}"></div>
+              <div class="card card-producto h-100" onclick="abrirDetalleProducto(${cat.id}, ${p.id})">
+                  ${badge}
+                  <div class="ratio-4x3"><img src="${p.img}"></div>
                   <div class="card-body text-center p-2 p-md-3 d-flex flex-column">
-                      <h6 class="card-title fw-bold text-truncate">${prod.nombre}</h6>
-                      <div class="mt-auto pt-1"><span class="badge-precio">${formatearRD(prod.precio)}</span></div>
+                      <h6 class="card-title fw-bold text-truncate">${p.nombre}</h6>
+                      <div class="mt-auto pt-1"><span class="badge-precio">${formatearRD(p.precio)}</span></div>
                   </div>
               </div>
           </div>`;
@@ -306,439 +217,348 @@ function mostrarProductosEnSeccion(titulo, productos) {
   irASeccion('productos');
 }
 
-function abrirDetalleProducto(catId, prodId) {
+function abrirDetalleProducto(cId, pId) {
   if(!modalDetalleInst) modalDetalleInst = new bootstrap.Modal(document.getElementById('modalProductoDetalle'));
-  const cat = categorias.find(c => c.id === catId);
-  const prod = cat?.productos.find(p => p.id === prodId);
+  const cat = categorias.find(c => c.id === cId);
+  const prod = cat?.productos.find(p => p.id === pId);
   if (!prod) return;
   
   document.getElementById('detalleImg').src = prod.img;
   document.getElementById('detalleCat').innerText = cat.nombre;
   document.getElementById('detalleNombre').innerText = prod.nombre;
   document.getElementById('detallePrecio').innerText = formatearRD(prod.precio);
-  document.getElementById('detalleDesc').innerText = prod.descripcion || "Producto personalizado a tu gusto.";
+  document.getElementById('detalleDesc').innerText = prod.descripcion || "Personalizado a tu gusto.";
   
-  const estadoEl = document.getElementById('detalleEstado');
-  const btnAgregar = document.getElementById('btnAgregarDetalle');
-
-  if(prod.disponible === false) {
-      estadoEl.innerHTML = '<span class="badge bg-danger">Agotado Temporalmente</span>';
-      btnAgregar.disabled = true;
-      btnAgregar.innerText = "No disponible";
-      btnAgregar.onclick = null;
+  const btn = document.getElementById('btnAgregarDetalle');
+  if(!prod.disponible) {
+      document.getElementById('detalleEstado').innerHTML = '<span class="badge bg-danger">Agotado</span>';
+      btn.disabled = true; btn.innerText = "No disponible"; btn.onclick = null;
   } else {
-      estadoEl.innerHTML = '<span class="badge bg-success bg-opacity-10 text-success border border-success">Disponible</span>';
-      btnAgregar.disabled = false;
-      btnAgregar.innerText = 'Agregar al Carrito';
-      btnAgregar.onclick = function() { agregarAlCarrito(prod); modalDetalleInst.hide(); };
+      document.getElementById('detalleEstado').innerHTML = '<span class="badge bg-success bg-opacity-10 text-success border border-success">Disponible</span>';
+      btn.disabled = false; btn.innerText = 'Agregar al Carrito';
+      btn.onclick = () => { agregarAlCarrito(prod); modalDetalleInst.hide(); };
   }
   modalDetalleInst.show();
 }
 
 function buscarProductos() {
-  const query = document.getElementById('searchInput').value.trim().toLowerCase();
-  const contCat = document.getElementById('contenedorCategorias');
-  const contRes = document.getElementById('contenedorResultados');
-  const listaRes = document.getElementById('listaResultados');
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const cc = document.getElementById('contenedorCategorias');
+  const cr = document.getElementById('contenedorResultados');
+  const lr = document.getElementById('listaResultados');
 
-  if (query === '') { contCat.classList.remove('d-none'); contRes.classList.add('d-none'); return; }
+  if (q === '') { cc.classList.remove('d-none'); cr.classList.add('d-none'); return; }
 
-  contCat.classList.add('d-none'); 
-  contRes.classList.remove('d-none'); 
-  listaRes.innerHTML = '';
-  
-  let resultados = [];
-  categorias.forEach(cat => cat.productos.forEach(prod => {
-      if (prod.nombre.toLowerCase().includes(query)) resultados.push({prod, catId: cat.id});
-  }));
+  cc.classList.add('d-none'); cr.classList.remove('d-none'); lr.innerHTML = '';
+  let res = [];
+  categorias.forEach(c => c.productos.forEach(p => { if (p.nombre.toLowerCase().includes(q)) res.push({p, catId: c.id}); }));
 
-  if(resultados.length === 0) {
-    listaRes.innerHTML = '<div class="col-12 text-center py-5 text-muted">Sin resultados.</div>';
-  } else {
-      resultados.forEach(r => {
-          listaRes.innerHTML += `
-              <div class="col-6 col-md-3 mb-3">
-                  <div class="card card-producto h-100" onclick="abrirDetalleProducto(${r.catId}, ${r.prod.id})">
-                      <div class="ratio-4x3"><img src="${r.prod.img}"></div>
-                      <div class="card-body text-center p-2"><h6 class="fw-bold">${r.prod.nombre}</h6><span class="badge-precio small">${formatearRD(r.prod.precio)}</span></div>
-                  </div>
-              </div>`;
+  if(res.length === 0) lr.innerHTML = '<div class="col-12 text-center py-5 text-muted">Sin resultados.</div>';
+  else {
+      res.forEach(r => {
+          lr.innerHTML += `<div class="col-6 col-md-3 mb-3"><div class="card card-producto h-100" onclick="abrirDetalleProducto(${r.catId}, ${r.p.id})">
+              <div class="ratio-4x3"><img src="${r.p.img}"></div>
+              <div class="card-body text-center p-2"><h6 class="fw-bold">${r.p.nombre}</h6><span class="badge-precio small">${formatearRD(r.p.precio)}</span></div>
+          </div></div>`;
       });
   }
 }
-
 function limpiarBusqueda() { document.getElementById('searchInput').value = ''; buscarProductos(); }
 
 // ================= CARRITO =================
 function getCarrito() { return JSON.parse(localStorage.getItem(usuarioActual ? `carrito_${usuarioActual}` : `carrito_invitado`)) || []; }
 function setCarrito(c) { localStorage.setItem(usuarioActual ? `carrito_${usuarioActual}` : `carrito_invitado`, JSON.stringify(c)); }
 
-function agregarAlCarrito(prod) {
-  const carrito = getCarrito();
-  const item = carrito.find(p => p.nombre === prod.nombre);
-  if (item) item.cantidad++;
-  else carrito.push({ nombre: prod.nombre, precio: prod.precio, img: prod.img, cantidad: 1 });
-  setCarrito(carrito);
-  actualizarContadorCarrito();
-  mostrarToast('Agregado al carrito 🛒');
+function agregarAlCarrito(p) {
+  const c = getCarrito();
+  const i = c.find(x => x.nombre === p.nombre);
+  if (i) i.cantidad++; else c.push({ nombre: p.nombre, precio: p.precio, img: p.img, cantidad: 1 });
+  setCarrito(c); actualizarContadorCarrito(); mostrarToast('Agregado al carrito 🛒');
 }
 
 function cargarCarrito() {
-  const carrito = getCarrito();
-  const container = document.getElementById('listaCarrito'); 
-  container.innerHTML = '';
-  if (carrito.length === 0) {
-    container.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-5">Carrito vacío</td></tr>';
-    document.getElementById('totalCarrito').innerText = 'RD$0.00';
-    return;
+  const c = getCarrito();
+  const tb = document.getElementById('listaCarrito'); tb.innerHTML = '';
+  if (c.length === 0) {
+    tb.innerHTML = '<tr><td colspan="5" class="text-center py-5">Carrito vacío</td></tr>';
+    document.getElementById('totalCarrito').innerText = 'RD$0.00'; return;
   }
-  let total = 0;
-  carrito.forEach((item, index) => {
-    total += item.precio * item.cantidad;
-    container.innerHTML += `
-      <tr>
-          <td>
-              <div class="d-flex align-items-center">
-                  <img src="${item.img}" style="width:40px;height:40px;object-fit:cover;border-radius:5px;margin-right:10px;">
-                  <span class="fw-bold small">${item.nombre}</span>
-              </div>
-          </td>
-          <td class="text-center small">${formatearRD(item.precio)}</td>
-          <td class="text-center">
-             <div class="input-group input-group-sm justify-content-center" style="width: 80px; margin: auto;">
-               <button class="btn btn-outline-secondary px-2" onclick="cambiarCantidad(${index}, -1)">-</button>
-               <span class="input-group-text bg-white px-2">${item.cantidad}</span>
-               <button class="btn btn-outline-secondary px-2" onclick="cambiarCantidad(${index}, 1)">+</button>
-             </div>
-          </td>
-          <td class="text-center fw-bold text-primary small">${formatearRD(item.precio*item.cantidad)}</td>
-          <td class="text-center"><button class="btn btn-sm text-danger" onclick="eliminarDelCarrito(${index})"><i class="bi bi-trash"></i></button></td>
-      </tr>`;
+  let tot = 0;
+  c.forEach((i, idx) => {
+    tot += i.precio * i.cantidad;
+    tb.innerHTML += `<tr>
+        <td><div class="d-flex align-items-center"><img src="${i.img}" style="width:40px;height:40px;object-fit:cover;border-radius:5px;margin-right:10px;"><span class="fw-bold small">${i.nombre}</span></div></td>
+        <td class="text-center small">${formatearRD(i.precio)}</td>
+        <td class="text-center"><div class="input-group input-group-sm justify-content-center" style="width:80px;margin:auto;"><button class="btn btn-outline-secondary" onclick="modCant(${idx},-1)">-</button><span class="input-group-text bg-white">${i.cantidad}</span><button class="btn btn-outline-secondary" onclick="modCant(${idx},1)">+</button></div></td>
+        <td class="text-center fw-bold text-primary small">${formatearRD(i.precio*i.cantidad)}</td>
+        <td class="text-center"><button class="btn btn-sm text-danger" onclick="elimItem(${idx})"><i class="bi bi-trash"></i></button></td>
+    </tr>`;
   });
-  document.getElementById('totalCarrito').innerText = formatearRD(total);
+  document.getElementById('totalCarrito').innerText = formatearRD(tot);
 }
+function modCant(i, d) { const c = getCarrito(); c[i].cantidad += d; if(c[i].cantidad<=0) c.splice(i,1); setCarrito(c); cargarCarrito(); actualizarContadorCarrito(); }
+function elimItem(i) { const c = getCarrito(); c.splice(i, 1); setCarrito(c); cargarCarrito(); actualizarContadorCarrito(); }
+function vaciarCarrito() { localStorage.removeItem(usuarioActual ? `carrito_${usuarioActual}` : `carrito_invitado`); cargarCarrito(); actualizarContadorCarrito(); }
 
-function cambiarCantidad(i, d) {
-  const c = getCarrito();
-  c[i].cantidad += d;
-  if (c[i].cantidad <= 0) c.splice(i, 1);
-  setCarrito(c); cargarCarrito(); actualizarContadorCarrito();
-}
-
-function eliminarDelCarrito(i) {
-  const c = getCarrito();
-  c.splice(i, 1);
-  setCarrito(c); cargarCarrito(); actualizarContadorCarrito();
-}
-
-function vaciarCarrito() { 
-  localStorage.removeItem(usuarioActual ? `carrito_${usuarioActual}` : `carrito_invitado`);
-  cargarCarrito(); actualizarContadorCarrito(); 
-}
-
-// ================= PROCESAR ORDEN / WHATSAPP / PDF =================
+// ================= PROCESO DE ORDEN =================
 function solicitarConfirmacion(tipo) {
     if(getCarrito().length === 0) return mostrarToast('Carrito vacío.');
     accionPendiente = tipo;
-    
-    // Texto del modal
-    document.getElementById('textoConfirmacion').innerText = (tipo === 'imprimir_descargar') 
-        ? "¿Generar PDF de la cotización?" 
-        : "Confirmar pedido para enviarlo por WhatsApp.";
-
-    document.getElementById('btnConfirmarAccion').onclick = async function() {
-        modalConfirmacionInst.hide();
-        await prepararDatosParaAccion();
-    };
+    document.getElementById('textoConfirmacion').innerText = (tipo === 'imprimir_descargar') ? "¿Generar cotización PDF?" : "Confirmar pedido para WhatsApp.";
+    document.getElementById('btnConfirmarAccion').onclick = async () => { modalConfirmacionInst.hide(); await prepararDatos(); };
     modalConfirmacionInst.show();
 }
 
-async function prepararDatosParaAccion() {
+async function prepararDatos() {
     if(usuarioActual && currentUser) {
         if (accionPendiente === 'imprimir_descargar') abrirVentanaImpresion();
-        await ejecutarAccionConDatos(currentUser);
-    } else {
-        modalDatosInvitadoInst.show();
-    }
+        await procesarPedido(currentUser);
+    } else { modalDatosInvitadoInst.show(); }
 }
 
 function abrirVentanaImpresion() {
     printWindow = window.open('', '_blank');
-    if (printWindow) printWindow.document.write('<div style="text-align:center;padding:50px;font-family:sans-serif;">Generando factura con logo...</div>');
+    if (printWindow) printWindow.document.write('<div style="text-align:center;padding:50px;font-family:sans-serif;">Generando documento...</div>');
 }
 
 async function confirmarDatosInvitado() {
-  const nombre = document.getElementById('invNombre').value.trim();
-  const apellido = document.getElementById('invApellido').value.trim();
-  const telefono = document.getElementById('invTelefono').value.trim();
-  if (!nombre || !telefono) return mostrarToast('Faltan datos.');
-
+  const d = { nombre: document.getElementById('invNombre').value, apellido: document.getElementById('invApellido').value, telefono: document.getElementById('invTelefono').value };
+  if (!d.nombre || !d.telefono) return mostrarToast('Datos incompletos.');
   modalDatosInvitadoInst.hide();
   if (accionPendiente === 'imprimir_descargar') abrirVentanaImpresion();
-  await ejecutarAccionConDatos({ nombre, apellido, telefono });
+  await procesarPedido(d);
 }
 
-async function ejecutarAccionConDatos(clienteData) {
-  const carrito = getCarrito();
-  const total = carrito.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
-  
-  const pedido = {
-    cliente: { nombre: clienteData.nombre, apellido: clienteData.apellido, telefono: clienteData.telefono },
-    items: carrito,
-    total: total,
-    estado: 'pendiente'
-  };
+async function procesarPedido(cliente) {
+  const items = getCarrito();
+  const total = items.reduce((s, i) => s + i.precio * i.cantidad, 0);
+  const pedido = { cliente: { nombre: cliente.nombre, apellido: cliente.apellido, telefono: cliente.telefono }, items, total, estado: 'pendiente' };
 
   const { data: newPedido, error } = await supabaseClient.from('pedidos').insert(pedido).select().single();
-
-  if (error || !newPedido) {
-    mostrarToast('Error al guardar pedido.');
-    if(printWindow) printWindow.close();
-    return;
+  
+  if (error || !newPedido) { 
+      mostrarToast('Error al procesar.'); 
+      if(printWindow) printWindow.close(); 
+      return; 
   }
 
-  // Obtener turno
-  formatPedido(newPedido);
+  // CALCULAR TURNO (Cola Dinámica)
+  // Contamos cuántos pedidos pendientes hay incluyéndose a sí mismo, ordenados por fecha.
+  // Pero para el cliente, su turno es simplemente la cantidad de pendientes actuales.
   const { count } = await supabaseClient.from('pedidos').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente');
-  const turno = count;
+  const turno = count; 
 
-  // Mostrar Éxito
   document.getElementById('numeroTurnoExito').innerText = `#${turno}`;
   
-  // Resetear botón manual de whatsapp
-  const containerBtn = document.getElementById('containerBtnWhatsappManual');
-  const btnManual = document.getElementById('btnWhatsappManual');
-  containerBtn.classList.add('d-none');
+  // Resetear botón manual whatsapp
+  const btnMan = document.getElementById('btnWhatsappManual');
+  const boxMan = document.getElementById('containerBtnWhatsappManual');
+  boxMan.classList.add('d-none');
 
   if (accionPendiente === 'imprimir_descargar' && printWindow) {
       imprimirFactura(newPedido, turno, printWindow);
   } else if (accionPendiente === 'whatsapp') {
-      // Generar URL
-      const urlWhatsapp = generarLinkWhatsApp(newPedido, turno);
+      const url = generarLinkWhatsApp(newPedido, turno);
+      btnMan.href = url;
+      boxMan.classList.remove('d-none');
       
-      // 1. Configurar botón manual por si falla el automático
-      btnManual.href = urlWhatsapp;
-      containerBtn.classList.remove('d-none');
-      
-      // 2. Intentar abrir automáticamente
-      const w = window.open(urlWhatsapp, '_blank');
-      if(!w || w.closed || typeof w.closed=='undefined') {
-          mostrarToast('Pulsa el botón verde para abrir WhatsApp.');
-      }
+      const w = window.open(url, '_blank');
+      if(!w || w.closed || typeof w.closed=='undefined') mostrarToast('Usa el botón verde para abrir WhatsApp.');
   }
 
   modalExitoOrdenInst.show();
   vaciarCarrito();
-  accionPendiente = null;
-  printWindow = null;
+  accionPendiente = null; printWindow = null;
 }
 
-function generarLinkWhatsApp(pedido, turno) {
-  let mensaje = `👋 Hola *Mariposas Cuties*, deseo realizar este pedido:\n\n`;
-  mensaje += `🔢 *Turno:* #${turno}\n`;
-  mensaje += `👤 *Cliente:* ${pedido.cliente.nombre} ${pedido.cliente.apellido}\n`;
-  mensaje += `📱 *Contacto:* ${pedido.cliente.telefono}\n\n`;
-  mensaje += `🛒 *PEDIDO:*\n`;
+function generarLinkWhatsApp(p, turno) {
+  let msg = `👋 Hola *Mariposas Cuties*, pedido nuevo:\n\n`;
+  msg += `🔢 *Turno:* #${turno}\n`;
+  msg += `👤 *Cliente:* ${p.cliente.nombre} ${p.cliente.apellido}\n`;
+  msg += `📱 *Tel:* ${p.cliente.telefono}\n\n`;
+  msg += `🛒 *DETALLE:*\n`;
+  p.items.forEach(i => msg += `- ${i.cantidad}x ${i.nombre} (${formatearRD(i.precio*i.cantidad)})\n`);
+  msg += `\n💰 *TOTAL: ${formatearRD(p.total)}*`;
   
-  pedido.items.forEach(item => {
-    mensaje += `- ${item.cantidad}x ${item.nombre} (${formatearRD(item.precio * item.cantidad)})\n`;
-  });
-  
-  mensaje += `\n💰 *TOTAL: ${formatearRD(pedido.total)}*`;
-  mensaje += `\n\n_Espero su confirmación. Gracias._`;
-  
-  const numeroTienda = "18090000000"; // PON TU NÚMERO AQUÍ
-  return `https://wa.me/${numeroTienda}?text=${encodeURIComponent(mensaje)}`;
+  // NÚMERO CORREGIDO
+  return `https://wa.me/18096659100?text=${encodeURIComponent(msg)}`;
 }
 
-// ================= FACTURA CON LOGO Y FOOTER 2026 =================
-function imprimirFactura(pedido, turno, win) {
+// ================= FACTURA PDF (LOGO + 2026) =================
+function imprimirFactura(p, turno, win) {
     if (!win) return;
-    let filasHTML = '';
-    pedido.items.forEach(i => {
-        filasHTML += `<tr>
-            <td style="padding:8px;border-bottom:1px solid #eee;">${i.nombre}</td>
-            <td style="padding:8px;text-align:center;border-bottom:1px solid #eee;">${i.cantidad}</td>
-            <td style="padding:8px;text-align:right;border-bottom:1px solid #eee;">${formatearRD(i.precio)}</td>
-            <td style="padding:8px;text-align:right;border-bottom:1px solid #eee;">${formatearRD(i.precio * i.cantidad)}</td>
-        </tr>`;
-    });
+    let rows = '';
+    p.items.forEach(i => rows += `<tr><td style="padding:8px;border-bottom:1px solid #eee;">${i.nombre}</td><td style="text-align:center;border-bottom:1px solid #eee;">${i.cantidad}</td><td style="text-align:right;border-bottom:1px solid #eee;">${formatearRD(i.precio)}</td><td style="text-align:right;border-bottom:1px solid #eee;">${formatearRD(i.precio*i.cantidad)}</td></tr>`);
 
     win.document.open();
     win.document.write(`
-    <html>
-    <head>
-      <title>Cotización #${pedido.id}</title>
-      <style>
-        body { font-family: 'Helvetica', sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; color: #333; }
-        .header { text-align: center; margin-bottom: 20px; border-bottom: 3px solid #6a1b9a; padding-bottom: 20px; }
-        .logo-img { width: 80px; height: 80px; object-fit: contain; margin-bottom: 10px; }
-        .empresa-nombre { font-size: 24px; font-weight: bold; color: #6a1b9a; text-transform: uppercase; margin: 0; }
-        .empresa-desc { font-size: 12px; color: #555; margin-top: 5px; font-style: italic; }
-        .info-row { display: flex; justify-content: space-between; margin-bottom: 20px; }
-        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-        .items-table th { background: #6a1b9a; color: white; padding: 10px; text-align: left; }
-        .total { text-align: right; font-size: 22px; font-weight: bold; color: #6a1b9a; }
-        
-        .footer { 
-            text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; 
-            font-size: 11px; color: #777; 
-        }
-        .social-icons { margin-top: 5px; }
-        @media print { .no-print { display: none; } }
-      </style>
-    </head>
-    <body>
-        <div class="no-print" style="text-align:center; margin-bottom:15px;">
-            <button onclick="window.print()" style="padding:10px 20px;background:#6a1b9a;color:white;border:none;border-radius:5px;cursor:pointer;">🖨️ Imprimir</button>
-        </div>
-
-        <div class="header">
-            <img src="Logo.PNG" alt="Logo" class="logo-img">
-            <h1 class="empresa-nombre">Mariposas Cuties</h1>
-            <p class="empresa-desc">Somos una empresa encargada de vender productos totalmente personalizados.</p>
-            <div style="font-size: 13px; margin-top: 5px;">
-                📍 Salcedo - Tenares, Rep. Dom. | 📞 809-000-0000
-            </div>
-        </div>
-
-        <div class="info-row">
-            <div>
-                <strong>CLIENTE:</strong><br>
-                ${pedido.cliente.nombre} ${pedido.cliente.apellido}<br>
-                ${pedido.cliente.telefono}
-            </div>
-            <div style="text-align: right;">
-                <strong>ORDEN #${pedido.id}</strong><br>
-                Fecha: ${pedido.fecha}<br>
-                Turno: #${turno || '?'}
-            </div>
-        </div>
-
-        <table class="items-table">
-            <thead><tr><th>Producto</th><th style="text-align:center;">Cant.</th><th style="text-align:right;">Precio</th><th style="text-align:right;">Total</th></tr></thead>
-            <tbody>${filasHTML}</tbody>
-        </table>
-
-        <div class="total">Total: ${formatearRD(pedido.total)}</div>
-
-        <div class="footer">
-            <p><strong>Ubicación:</strong> Salcedo - Tenares, República Dominicana.</p>
-            <p><a href="https://maps.google.com" style="color:#6a1b9a;text-decoration:none;">[Ver en Google Maps]</a> | Instagram: @mariposascuties</p>
-            <p style="margin-top:10px;">&copy; 2026 Mariposas Cuties. Todos los derechos reservados.</p>
-        </div>
-    </body>
-    </html>`);
+    <html><head><title>Cotización #${p.id}</title>
+    <style>
+      body { font-family: sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; color: #333; }
+      .header { text-align: center; border-bottom: 3px solid #6a1b9a; padding-bottom: 20px; margin-bottom: 20px; }
+      .logo { height: 80px; margin-bottom: 10px; }
+      .title { font-size: 24px; font-weight: bold; color: #6a1b9a; text-transform: uppercase; margin: 0; }
+      .desc { font-size: 12px; color: #666; font-style: italic; margin-top: 5px; }
+      .meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+      th { background: #6a1b9a; color: white; padding: 8px; text-align: left; }
+      .total { text-align: right; font-size: 20px; font-weight: bold; color: #6a1b9a; }
+      .footer { text-align: center; margin-top: 50px; border-top: 1px solid #ddd; padding-top: 20px; font-size: 11px; color: #777; }
+      @media print { button { display: none; } }
+    </style></head><body>
+      <div style="text-align:center;margin-bottom:10px;"><button onclick="window.print()" style="padding:10px 20px;background:#6a1b9a;color:white;border:none;border-radius:5px;cursor:pointer;">🖨️ Imprimir</button></div>
+      <div class="header">
+          <img src="Logo.PNG" class="logo" alt="Logo">
+          <h1 class="title">Mariposas Cuties</h1>
+          <p class="desc">Somos una empresa encargada de vender productos totalmente personalizados.</p>
+          <div style="font-size:13px;margin-top:5px;">📍 Salcedo - Tenares, Rep. Dom. | 📞 809-665-9100</div>
+      </div>
+      <div class="meta">
+          <div><strong>CLIENTE:</strong><br>${p.cliente.nombre} ${p.cliente.apellido}<br>${p.cliente.telefono}</div>
+          <div style="text-align:right;"><strong>ORDEN #${p.id}</strong><br>Fecha: ${p.fecha}<br>Turno: #${turno || '?'}</div>
+      </div>
+      <table><thead><tr><th>Producto</th><th style="text-align:center;">Cant.</th><th style="text-align:right;">Precio</th><th style="text-align:right;">Total</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="total">Total: ${formatearRD(p.total)}</div>
+      <div class="footer">
+          <p><strong>Ubicación:</strong> Salcedo - Tenares, República Dominicana.</p>
+          <p>Instagram: @mariposascuties | Facebook: Mariposas Cuties</p>
+          <p>© 2026 Mariposas Cuties. Todos los derechos reservados.</p>
+      </div>
+    </body></html>`);
     win.document.close();
 }
 
-// ================= ADMIN =================
+// ================= ADMIN (NUEVAS FUNCIONES) =================
 async function actualizarBadgeColaAdmin() {
   const { count } = await supabaseClient.from('pedidos').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente');
   if(document.getElementById('badgeColaAdmin')) document.getElementById('badgeColaAdmin').innerText = count || 0;
 }
 
-async function cargarCategoriasAdmin() {
-  categorias = await loadCategories();
-  const tb = document.getElementById('tablaCategoriasAdmin');
-  if(!tb) return;
-  tb.innerHTML = '';
-  categorias.forEach(cat => {
-    tb.innerHTML += `<tr>
-        <td class="align-middle"><img src="${cat.img}" style="width:40px;height:40px;object-fit:cover;border-radius:5px;"></td>
-        <td class="align-middle fw-bold">${cat.nombre}</td>
-        <td class="text-end">
-            <button class="btn btn-sm btn-light border" onclick="prepararFormCat(${cat.id})" data-bs-toggle="modal" data-bs-target="#modalCategoria"><i class="bi bi-pencil"></i></button>
-            <button class="btn btn-sm btn-danger" onclick="eliminarCategoria(${cat.id})"><i class="bi bi-trash"></i></button>
-        </td>
-    </tr>`;
-  });
+// 1. Borrar TODO
+async function confirmarBorrarTodo() {
+    if(confirm('⚠️ ¡PELIGRO! ¿Estás seguro de BORRAR TODOS los pedidos del historial? Esto no se puede deshacer.')) {
+        // Truco para borrar todo: borrar donde id > 0
+        const { error } = await supabaseClient.from('pedidos').delete().gt('id', 0);
+        if(!error) { cargarPedidosAdmin(); actualizarBadgeColaAdmin(); mostrarToast('Historial vaciado por completo.'); }
+        else mostrarToast('Error al borrar.');
+    }
 }
 
-async function cargarProductosAdmin() {
-  categorias = await loadCategories();
-  const tb = document.getElementById('tablaProductosAdmin');
-  if(!tb) return;
-  tb.innerHTML = '';
-  categorias.forEach(cat => {
-    cat.productos.forEach(prod => {
-      tb.innerHTML += `<tr>
-          <td class="align-middle"><img src="${prod.img}" style="width:40px;height:40px;object-fit:cover;"></td>
-          <td class="align-middle"><div>${prod.nombre}</div><small class="text-muted">${cat.nombre}</small></td>
-          <td class="align-middle">${formatearRD(prod.precio)}</td>
-          <td class="align-middle">${prod.disponible ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-danger">Agotado</span>'}</td>
-          <td class="text-end align-middle">
-              <button class="btn btn-sm btn-light border" onclick="prepararFormProd(${cat.id},${prod.id})" data-bs-toggle="modal" data-bs-target="#modalProducto"><i class="bi bi-pencil"></i></button>
-              <button class="btn btn-sm btn-danger" onclick="eliminarProducto(${prod.id})"><i class="bi bi-trash"></i></button>
-          </td>
-      </tr>`;
-    });
-  });
+// 2. Borrar UNO
+async function borrarPedidoUnico(id) {
+    if(confirm('¿Eliminar este pedido permanentemente?')) {
+        const { error } = await supabaseClient.from('pedidos').delete().eq('id', id);
+        if(!error) { cargarPedidosAdmin(); actualizarBadgeColaAdmin(); mostrarToast('Pedido eliminado.'); }
+    }
+}
+
+// 3. Ver Detalles (MODO FACTURA)
+function verDetallePedidoAdmin(pedido, turnoVisual) {
+    const win = window.open('', '_blank');
+    if(win) {
+        win.document.write('<div style="text-align:center;padding:50px;">Cargando vista previa...</div>');
+        imprimirFactura(pedido, turnoVisual, win);
+    }
 }
 
 async function cargarPedidosAdmin() {
-  historialPedidos = await loadPedidos();
-  const c = document.getElementById('listaPedidosAdmin');
-  if(!c) return;
-  c.innerHTML = '';
-  historialPedidos.sort((a,b) => (a.estado==='pendiente' && b.estado!=='pendiente') ? -1 : 1).forEach(p => {
-      let color = p.estado === 'pendiente' ? 'border-warning border-start border-5' : 'border-success border-start border-5 opacity-75';
-      let btnDone = p.estado === 'pendiente' ? `<button class="btn btn-sm btn-success w-100 mt-2" onclick="marcarPedidoCompletado(${p.id})">Completar</button>` : '';
-      c.innerHTML += `<div class="col-md-6 col-lg-4"><div class="card shadow-sm mb-3 ${color}"><div class="card-body">
-          <div class="d-flex justify-content-between mb-2"><span class="fw-bold">#${p.id}</span>${p.estado==='pendiente'?'<span class="badge bg-warning text-dark">Pendiente</span>':'<span class="badge bg-success">Listo</span>'}</div>
-          <h5 class="card-title text-primary fw-bold">${p.cliente.nombre}</h5>
-          <p class="mb-1 text-muted"><i class="bi bi-whatsapp"></i> ${p.cliente.telefono}</p>
-          <h6 class="mt-2 fw-bold text-end">${formatearRD(p.total)}</h6><hr>
-          <button class="btn btn-sm btn-outline-dark w-100" onclick='verDetallePedido(${JSON.stringify(p)})'>Ver</button>${btnDone}
-      </div></div></div>`;
+  historialPedidos = await loadPedidos(); // Vienen ordenados por fecha ascendente
+  const container = document.getElementById('listaPedidosAdmin'); if(!container) return;
+  container.innerHTML = '';
+  
+  if(historialPedidos.length === 0) { container.innerHTML = '<div class="col-12 text-center text-muted">No hay pedidos registrados.</div>'; return; }
+
+  // Filtramos y ordenamos para mostrar la COLA visualmente correcta
+  // Los pendientes van primero. 
+  // Calculamos el índice visual (Turno #1, #2...) solo para los pendientes.
+  
+  let contadorTurno = 1;
+
+  // Separar pendientes y completados
+  const pendientes = historialPedidos.filter(p => p.estado === 'pendiente');
+  const completados = historialPedidos.filter(p => p.estado !== 'pendiente').sort((a,b) => b.id - a.id); // Completados: los más recientes primero
+
+  // Renderizar Pendientes (Cola FIFO)
+  pendientes.forEach(p => {
+      const turnoVisual = contadorTurno++;
+      container.innerHTML += crearCardPedidoAdmin(p, turnoVisual, true);
   });
+
+  // Renderizar Completados
+  if(completados.length > 0) {
+      container.innerHTML += '<div class="col-12 mt-4 mb-2"><h6 class="border-bottom pb-2 text-muted">Historial Completados</h6></div>';
+      completados.forEach(p => {
+          container.innerHTML += crearCardPedidoAdmin(p, '-', false);
+      });
+  }
 }
 
-function verDetallePedido(p) {
-    let html = `<ul class="list-group list-group-flush mb-3">`;
-    p.items.forEach(i => html += `<li class="list-group-item d-flex justify-content-between">${i.cantidad}x ${i.nombre} <span class="fw-bold">${formatearRD(i.precio*i.cantidad)}</span></li>`);
-    html += `</ul><h4 class="text-end text-primary fw-bold">Total: ${formatearRD(p.total)}</h4>`;
-    document.getElementById('cuerpoDetallePedido').innerHTML = html;
-    modalDetallePedidoInst.show();
+function crearCardPedidoAdmin(p, turno, esPendiente) {
+    const color = esPendiente ? 'border-warning border-start border-5' : 'border-success border-start border-5 opacity-75';
+    const badge = esPendiente ? `<span class="badge bg-warning text-dark">Turno #${turno}</span>` : '<span class="badge bg-success">Completado</span>';
+    const btnAccion = esPendiente ? `<button class="btn btn-sm btn-success w-100 mt-2" onclick="marcarPedidoCompletado(${p.id})">✅ Marcar Completado</button>` : '';
+    
+    // Convertimos el objeto pedido a string seguro para pasarlo a la función
+    // Pero como ya tenemos el objeto 'p' en memoria en historialPedidos, mejor lo buscamos por ID al hacer click para evitar errores de comillas
+    
+    return `
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm mb-3 ${color}">
+            <div class="card-body position-relative">
+                <button class="btn btn-sm text-danger position-absolute top-0 end-0 m-2" title="Borrar pedido" onclick="borrarPedidoUnico(${p.id})"><i class="bi bi-x-lg"></i></button>
+                <div class="d-flex justify-content-between mb-2 align-items-center">
+                    <span class="fw-bold text-muted small">ID: ${p.id}</span>
+                    ${badge}
+                </div>
+                <h5 class="card-title text-primary fw-bold text-truncate">${p.cliente.nombre} ${p.cliente.apellido}</h5>
+                <p class="mb-1 text-muted small"><i class="bi bi-whatsapp me-1"></i>${p.cliente.telefono}</p>
+                <p class="mb-1 text-muted small">${p.fecha}</p>
+                <h6 class="mt-2 fw-bold text-end">Total: ${formatearRD(p.total)}</h6>
+                <hr>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-dark flex-grow-1" onclick='buscarYVerDetalle(${p.id}, "${turno}")'><i class="bi bi-file-earmark-text"></i> Ver Factura</button>
+                </div>
+                ${btnAccion}
+            </div>
+        </div>
+    </div>`;
+}
+
+function buscarYVerDetalle(id, turno) {
+    const p = historialPedidos.find(x => x.id === id);
+    if(p) verDetallePedidoAdmin(p, turno);
 }
 
 async function marcarPedidoCompletado(id) {
-    if(confirm('¿Pedido entregado?')) {
+    if(confirm('¿Pedido entregado y finalizado? Desaparecerá de la cola principal.')) {
         await supabaseClient.from('pedidos').update({estado: 'completado'}).eq('id', id);
-        cargarPedidosAdmin(); mostrarToast("Completado ✅");
+        cargarPedidosAdmin(); actualizarBadgeColaAdmin(); mostrarToast("Pedido completado.");
     }
 }
 
-// Helpers Form Admin
-function prepararFormCat(id) {
-    document.getElementById('catId').value = id || '';
-    if(id) { const c = categorias.find(x => x.id == id); document.getElementById('catNombre').value = c.nombre; document.getElementById('catImg').value = c.img; }
-    else { document.getElementById('catNombre').value = ''; document.getElementById('catImg').value = ''; }
+// ================= CRUD ADMIN (CATEGORIAS/PRODUCTOS) =================
+async function cargarCategoriasAdmin() {
+  categorias = await loadCategories();
+  const tb = document.getElementById('tablaCategoriasAdmin'); if(!tb) return;
+  tb.innerHTML = '';
+  categorias.forEach(c => {
+    tb.innerHTML += `<tr><td class="align-middle"><img src="${c.img}" style="width:40px;height:40px;object-fit:cover;border-radius:5px;"></td><td class="align-middle fw-bold">${c.nombre}</td><td class="text-end"><button class="btn btn-sm btn-light border me-1" onclick="prepCat(${c.id})" data-bs-toggle="modal" data-bs-target="#modalCategoria"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-danger" onclick="delCat(${c.id})"><i class="bi bi-trash"></i></button></td></tr>`;
+  });
 }
-async function guardarCategoria() {
-    const id = document.getElementById('catId').value, nombre = document.getElementById('catNombre').value, img = document.getElementById('catImg').value;
-    if(!nombre) return;
-    const { error } = id ? await supabaseClient.from('categorias').update({nombre, img}).eq('id', id) : await supabaseClient.from('categorias').insert({nombre, img});
-    if(!error) { modalCategoriaInst.hide(); cargarCategoriasAdmin(); mostrarToast("Guardado"); }
+async function cargarProductosAdmin() {
+  categorias = await loadCategories();
+  const tb = document.getElementById('tablaProductosAdmin'); if(!tb) return;
+  tb.innerHTML = '';
+  categorias.forEach(c => c.productos.forEach(p => {
+      tb.innerHTML += `<tr><td class="align-middle"><img src="${p.img}" style="width:40px;height:40px;object-fit:cover;"></td><td class="align-middle"><div>${p.nombre}</div><small class="text-muted">${c.nombre}</small></td><td class="align-middle">${formatearRD(p.precio)}</td><td class="align-middle">${p.disponible?'<span class="badge bg-success">Ok</span>':'<span class="badge bg-danger">Agotado</span>'}</td><td class="text-end"><button class="btn btn-sm btn-light border me-1" onclick="prepProd(${c.id},${p.id})" data-bs-toggle="modal" data-bs-target="#modalProducto"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-danger" onclick="delProd(${p.id})"><i class="bi bi-trash"></i></button></td></tr>`;
+  }));
 }
-async function eliminarCategoria(id) { if(confirm("¿Eliminar?")) { await supabaseClient.from('categorias').delete().eq('id', id); cargarCategoriasAdmin(); } }
 
-function prepararFormProd(catId, prodId) {
-    const s = document.getElementById('prodCatId'); s.innerHTML = ''; categorias.forEach(c => s.innerHTML += `<option value="${c.id}">${c.nombre}</option>`);
-    document.getElementById('prodId').value = prodId || '';
-    if(prodId) {
-        const p = categorias.find(c => c.id == catId).productos.find(x => x.id == prodId);
-        s.value = catId; document.getElementById('prodNombre').value = p.nombre; document.getElementById('prodPrecio').value = p.precio;
-        document.getElementById('prodImg').value = p.img; document.getElementById('prodDisponible').checked = p.disponible;
-    } else {
-        document.getElementById('prodNombre').value = ''; document.getElementById('prodPrecio').value = ''; document.getElementById('prodImg').value = '';
-    }
-}
-async function guardarProducto() {
-    const id = document.getElementById('prodId').value, catId = document.getElementById('prodCatId').value, nombre = document.getElementById('prodNombre').value, precio = document.getElementById('prodPrecio').value, img = document.getElementById('prodImg').value, disp = document.getElementById('prodDisponible').checked;
-    if(!nombre) return;
-    const payload = { category_id: catId, nombre, precio, img, disponible: disp };
-    const { error } = id ? await supabaseClient.from('productos').update(payload).eq('id', id) : await supabaseClient.from('productos').insert(payload);
-    if(!error) { modalProductoInst.hide(); cargarProductosAdmin(); mostrarToast("Guardado"); }
-}
-async function eliminarProducto(id) { if(confirm("¿Eliminar?")) { await supabaseClient.from('productos').delete().eq('id', id); cargarProductosAdmin(); } }
+// Helpers cortos para CRUD
+function prepCat(id){ document.getElementById('catId').value=id||''; if(id){const c=categorias.find(x=>x.id==id);document.getElementById('catNombre').value=c.nombre;document.getElementById('catImg').value=c.img;}else{document.getElementById('catNombre').value='';document.getElementById('catImg').value='';}}
+async function guardarCategoria(){ const id=document.getElementById('catId').value,n=document.getElementById('catNombre').value,i=document.getElementById('catImg').value; if(!n)return; const {error}=id?await supabaseClient.from('categorias').update({nombre:n,img:i}).eq('id',id):await supabaseClient.from('categorias').insert({nombre:n,img:i}); if(!error){modalCategoriaInst.hide();cargarCategoriasAdmin();} }
+async function delCat(id){ if(confirm("¿Borrar?")) {await supabaseClient.from('categorias').delete().eq('id',id);cargarCategoriasAdmin();} }
+
+function prepProd(cid,pid){ const s=document.getElementById('prodCatId');s.innerHTML='';categorias.forEach(c=>s.innerHTML+=`<option value="${c.id}">${c.nombre}</option>`); document.getElementById('prodId').value=pid||''; if(pid){const p=categorias.find(c=>c.id==cid).productos.find(x=>x.id==pid);s.value=cid;document.getElementById('prodNombre').value=p.nombre;document.getElementById('prodPrecio').value=p.precio;document.getElementById('prodImg').value=p.img;document.getElementById('prodDesc').value=p.descripcion||'';document.getElementById('prodDisponible').checked=p.disponible;}else{document.getElementById('prodNombre').value='';document.getElementById('prodPrecio').value='';document.getElementById('prodImg').value='';document.getElementById('prodDesc').value='';}}
+async function guardarProducto(){ const id=document.getElementById('prodId').value,cid=document.getElementById('prodCatId').value,n=document.getElementById('prodNombre').value,p=document.getElementById('prodPrecio').value,i=document.getElementById('prodImg').value,d=document.getElementById('prodDesc').value,disp=document.getElementById('prodDisponible').checked; if(!n)return; const pay={category_id:cid,nombre:n,precio:p,img:i,descripcion:d,disponible:disp}; const {error}=id?await supabaseClient.from('productos').update(pay).eq('id',id):await supabaseClient.from('productos').insert(pay); if(!error){modalProductoInst.hide();cargarProductosAdmin();} }
+async function delProd(id){ if(confirm("¿Borrar?")) {await supabaseClient.from('productos').delete().eq('id',id);cargarProductosAdmin();} }
