@@ -2,122 +2,136 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mariposas Cuties - Shop</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Mariposas Cuties - Tienda Oficial</title>
+  
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   
-  <title>Mariposas Cuties | Tienda Online</title>
   <link rel="icon" type="image/png" href="Logo.PNG">
   <link rel="apple-touch-icon" href="Logo.PNG">
 
-  
-  <!-- Supabase Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg sticky-top">
-  <div class="container-fluid px-4">
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <a class="navbar-brand" href="#" onclick="irASeccion('portada')">
-      <i class="bi bi-stars me-2"></i>Mariposas Cuties<i class="bi bi-stars me-2"></i>
-    </a>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="categoriaMenu"></ul>
-      <ul class="navbar-nav mb-2 mb-lg-0">
-        <li class="nav-item">
-          <a class="nav-link" href="#" onclick="irASeccion('contacto')">Contacto</a>
-        </li>
-      </ul>
+<div id="loader-overlay" class="d-flex justify-content-center align-items-center position-fixed w-100 h-100 top-0 start-0 bg-white" style="z-index: 9999; transition: opacity 0.5s;">
+    <div class="text-center">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
+        <p class="mt-2 fw-bold text-primary animate-pulse">Cargando Mariposas Cuties...</p>
     </div>
-    <div class="d-flex align-items-center">
-      <div id="authButtonsContainer" class="d-flex me-3">
-        <button class="btn btn-outline-light btn-sm me-2" onclick="irASeccion('login')"><i class="bi bi-person-circle"></i> Login</button>
-        <button class="btn btn-light btn-sm text-primary fw-bold" onclick="irASeccion('registro')"><i class="bi bi-person-plus"></i> Registro</button>
-      </div>
+</div>
 
-      <button class="btn btn-warning btn-sm me-3 d-none shadow-sm" onclick="irASeccion('adminPanel')" id="btnAdminNav"><i class="bi bi-gear-fill"></i> Admin</button>
+<nav class="navbar navbar-expand-lg sticky-top glass-effect">
+  <div class="container-fluid px-3 px-md-4">
+    <button class="navbar-toggler border-0 text-white" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <i class="bi bi-list fs-1"></i>
+    </button>
 
-      <div id="userDropdownContainer" class="d-none me-3">
-        <div class="dropdown">
-            <button class="btn btn-light btn-sm dropdown-toggle text-primary fw-bold" type="button" data-bs-toggle="dropdown">
-                <i class="bi bi-person-check-fill"></i> <span id="userNameNav"></span>
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg p-2 rounded-4">
-                <li><a class="dropdown-item rounded-3" href="#" onclick="cerrarSesion()"><i class="bi bi-box-arrow-right me-2"></i> Cerrar sesión</a></li>
-            </ul>
+    <a class="navbar-brand me-auto" href="#" onclick="irASeccion('portada')">
+      <i class="bi bi-stars me-1"></i> Mariposas Cuties
+    </a>
+
+    <button class="btn btn-link nav-link position-relative order-lg-last ms-2" onclick="irASeccion('carrito')" id="btnCarrito">
+        <div class="icon-circle-bg">
+            <i class="bi bi-cart-fill fs-5 text-white"></i>
         </div>
-      </div>
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark border border-light shadow-sm" id="cartCount">0</span>
+    </button>
 
-      <button class="btn btn-link nav-link position-relative" onclick="irASeccion('carrito')" id="btnCarrito">
-        <div style="background: rgba(255,255,255,0.2); padding: 8px; border-radius: 50%;">
-            <i class="bi bi-cart-fill fs-5"></i>
-        </div>
-        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark border border-light" id="cartCount">0</span>
-      </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0 text-center text-lg-start" id="categoriaMenu">
+        </ul>
+      
+      <hr class="d-lg-none text-white-50">
+
+      <div class="d-flex flex-column flex-lg-row align-items-center gap-2">
+          <div id="authButtonsContainer" class="d-flex gap-2">
+            <button class="btn btn-outline-light btn-sm rounded-pill px-3" onclick="irASeccion('login')">Login</button>
+            <button class="btn btn-light btn-sm text-primary fw-bold rounded-pill px-3" onclick="irASeccion('registro')">Registro</button>
+          </div>
+
+          <button class="btn btn-warning btn-sm d-none shadow-sm rounded-pill px-3" onclick="irASeccion('adminPanel')" id="btnAdminNav">
+            <i class="bi bi-gear-fill"></i> Admin
+          </button>
+
+          <div id="userDropdownContainer" class="d-none">
+            <div class="dropdown">
+                <button class="btn btn-light btn-sm dropdown-toggle text-primary fw-bold rounded-pill px-3" type="button" data-bs-toggle="dropdown">
+                    <i class="bi bi-person-check-fill"></i> <span id="userNameNav">Usuario</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg p-2 rounded-4">
+                    <li><a class="dropdown-item rounded-3" href="#" onclick="cerrarSesion()"><i class="bi bi-box-arrow-right me-2"></i> Cerrar sesión</a></li>
+                </ul>
+            </div>
+          </div>
+      </div>
     </div>
   </div>
 </nav>
 
-<div class="container my-5">
+<div class="container my-4 my-md-5" style="min-height: 80vh;">
   
   <div id="portada" class="seccion active">
-    <h1 class="display-4 fw-bold mb-2 text-center" style="color: purple;">¿Que Detalle Buscas Hoy?</h1>
-    <h3 class="display-7 fw-bold mb-2 text-center" style="color: blue;">Mira Todos Nuestro Articulos Personalizados que tenemos para ti</h3>
-    <p class="lead text-black fw-bold text-center mb-2">El precio de cada artículo incluye el personalizado.</p>
-    <p class="text-muted text-center mb-4">Selecciona una categoría del menú superior o busca tu producto ideal.</p>
-    
-    <div class="card p-4 mb-5 bg-white">
-        <div class="input-group">
-            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-primary"></i></span>
-            <input type="text" id="searchInput" class="form-control border-start-0 ps-0" 
-                   placeholder="¿Qué estás buscando? (Ej: Taza térmica)" oninput="buscarProductos()">
+    <div class="text-center mb-5 animate-fade-in">
+        <h1 class="display-5 fw-bold mb-2 text-gradient-primary">¿Qué Detalle Buscas Hoy?</h1>
+        <p class="lead text-dark fw-bold mb-2">Artículos 100% Personalizados a tu gusto</p>
+        <p class="text-muted small">El precio incluye el diseño y personalizado.</p>
+        
+        <div class="search-container mx-auto mt-4" style="max-width: 600px;">
+            <div class="input-group shadow-sm rounded-pill overflow-hidden bg-white border">
+                <span class="input-group-text bg-white border-0 ps-3"><i class="bi bi-search text-primary"></i></span>
+                <input type="text" id="searchInput" class="form-control border-0 py-3" 
+                       placeholder="Buscar (ej: Taza, Llavero...)" oninput="buscarProductos()">
+            </div>
         </div>
     </div>
 
-    <h3 class="mb-4">Explorar Catálogo</h3>
+    <h3 class="mb-3 fw-bold ps-2 border-start border-4 border-primary">Explorar Categorías</h3>
     <div id="contenedorCategorias">
-        <div class="row g-4" id="listaCategorias"></div>
+        <div class="row g-3 g-md-4" id="listaCategorias">
+            </div>
     </div>
 
     <div id="contenedorResultados" class="d-none">
         <div class="d-flex justify-content-between align-items-center mb-3">
-             <h4 class="text-muted">Resultados de búsqueda:</h4>
-             <button class="btn btn-sm btn-link text-danger" onclick="limpiarBusqueda()">Limpiar busqueda</button>
+             <h4 class="text-muted">Resultados:</h4>
+             <button class="btn btn-sm btn-outline-danger rounded-pill" onclick="limpiarBusqueda()">
+                <i class="bi bi-x-lg"></i> Cerrar búsqueda
+             </button>
         </div>
-        <div class="row g-4" id="listaResultados"></div>
+        <div class="row g-3" id="listaResultados"></div>
     </div>
   </div>
 
   <div id="login" class="seccion">
     <div class="row justify-content-center">
-      <div class="col-md-5">
-        <div class="card p-5 shadow-lg border-0">
+      <div class="col-md-5 col-lg-4">
+        <div class="card p-4 p-md-5 shadow-lg border-0 rounded-4">
           <div class="text-center mb-4">
-              <div class="bg-light rounded-circle d-inline-block p-3 mb-2"><i class="bi bi-person-circle fs-1 text-primary"></i></div>
+              <div class="bg-primary-subtle rounded-circle d-inline-block p-3 mb-2">
+                <i class="bi bi-person-circle fs-1 text-primary"></i>
+              </div>
               <h3>Bienvenido</h3>
           </div>
           <form onsubmit="event.preventDefault(); iniciarSesion();">
-            <div class="mb-4">
-              <label class="form-label text-muted small fw-bold">USUARIO</label>
-              <input type="text" id="loginUser" class="form-control form-control-lg" placeholder="Nombre de usuario" required>
+            <div class="form-floating mb-3">
+              <input type="text" id="loginUser" class="form-control rounded-3" placeholder="Usuario" required>
+              <label>Usuario</label>
             </div>
-            <div class="mb-4">
-              <label class="form-label text-muted small fw-bold">CONTRASEÑA</label>
-              <input type="password" id="loginPass" class="form-control form-control-lg" placeholder="••••••••" required>
+            <div class="form-floating mb-4">
+              <input type="password" id="loginPass" class="form-control rounded-3" placeholder="Contraseña" required>
+              <label>Contraseña</label>
             </div>
-            <button type="submit" class="btn btn-primary w-100 py-2 mb-3 shadow">Ingresar</button>
+            <button type="submit" class="btn btn-primary w-100 py-2 mb-3 rounded-pill shadow">Ingresar</button>
           </form>
           <div class="text-center mt-3">
-              <small class="text-muted">¿Nuevo aquí?</small>
-              <a href="#" onclick="irASeccion('registro')" class="fw-bold text-primary text-decoration-none">Crear cuenta</a>
-              <br>
-              <a href="#" onclick="irASeccion('portada')" class="text-secondary text-decoration-none small mt-2 d-inline-block">Volver al inicio</a>
+              <a href="#" onclick="irASeccion('registro')" class="fw-bold text-primary text-decoration-none">Crear cuenta nueva</a>
+              <div class="mt-3">
+                <a href="#" onclick="irASeccion('portada')" class="text-secondary small text-decoration-none">← Volver al inicio</a>
+              </div>
           </div>
         </div>
       </div>
@@ -126,47 +140,47 @@
 
   <div id="registro" class="seccion">
     <div class="row justify-content-center">
-      <div class="col-md-8">
-        <div class="card p-5 border-0">
-          <h3 class="mb-4 text-center text-primary">Crear Nueva Cuenta</h3>
+      <div class="col-md-8 col-lg-6">
+        <div class="card p-4 shadow-sm border-0 rounded-4">
+          <h3 class="mb-4 text-center text-primary fw-bold">Nueva Cuenta</h3>
           <form onsubmit="event.preventDefault(); registrarUsuario();">
-            <div class="row g-3 mb-3">
-              <div class="col-md-6">
-                <label class="form-label small text-muted fw-bold">Nombre</label>
-                <input type="text" id="regNombre" class="form-control" required>
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="small text-muted fw-bold">Nombre</label>
+                <input type="text" id="regNombre" class="form-control bg-light" required>
               </div>
-              <div class="col-md-6">
-                <label class="form-label small text-muted fw-bold">Apellido</label>
-                <input type="text" id="regApellido" class="form-control" required>
+              <div class="col-6">
+                <label class="small text-muted fw-bold">Apellido</label>
+                <input type="text" id="regApellido" class="form-control bg-light" required>
               </div>
             </div>
             <div class="mb-3">
-              <label class="form-label small text-muted fw-bold">Dirección</label>
-              <input type="text" id="regDireccion" class="form-control" placeholder="Ej: Calle Principal #123, Tenares" required>
+              <label class="small text-muted fw-bold">Dirección</label>
+              <input type="text" id="regDireccion" class="form-control bg-light" required>
             </div>
             <div class="mb-3">
-              <label class="form-label small text-muted fw-bold">Teléfono / Celular</label>
-              <input type="tel" id="regTelefono" class="form-control" placeholder="809-000-0000" required>
+              <label class="small text-muted fw-bold">Teléfono / WhatsApp</label>
+              <input type="tel" id="regTelefono" class="form-control bg-light" required>
             </div>
-            <hr class="my-4 border-light">
+            <hr>
             <div class="mb-3">
-              <label class="form-label small text-muted fw-bold">Usuario (Login)</label>
-              <input type="text" id="regUser" class="form-control" required>
+              <label class="small text-muted fw-bold">Usuario (Login)</label>
+              <input type="text" id="regUser" class="form-control bg-light" required>
             </div>
-            <div class="row g-3 mb-4">
-                <div class="col-md-6">
-                    <label class="form-label small text-muted fw-bold">Contraseña</label>
-                    <input type="password" id="regPass" class="form-control" required>
+            <div class="row g-2 mb-4">
+                <div class="col-6">
+                    <label class="small text-muted fw-bold">Contraseña</label>
+                    <input type="password" id="regPass" class="form-control bg-light" required>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label small text-muted fw-bold">Confirmar</label>
-                    <input type="password" id="regPassConfirm" class="form-control" required>
+                <div class="col-6">
+                    <label class="small text-muted fw-bold">Confirmar</label>
+                    <input type="password" id="regPassConfirm" class="form-control bg-light" required>
                 </div>
             </div>
-            <button type="submit" class="btn btn-success w-100 py-2 fs-5">Registrarse</button>
+            <button type="submit" class="btn btn-success w-100 py-2 rounded-pill shadow">Registrarse</button>
           </form>
-          <div class="text-center mt-4">
-             <button class="btn btn-link text-secondary text-decoration-none" onclick="irASeccion('portada')"><i class="bi bi-arrow-left"></i> Cancelar</button>
+          <div class="text-center mt-3">
+             <button class="btn btn-link text-secondary text-decoration-none" onclick="irASeccion('portada')">Cancelar</button>
           </div>
         </div>
       </div>
@@ -174,208 +188,254 @@
   </div>
 
   <div id="productos" class="seccion">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 id="tituloCategoria" class="text-primary fw-bold"></h3>
-        <button class="btn btn-outline-secondary rounded-pill" onclick="irASeccion('portada')"><i class="bi bi-arrow-left me-1"></i> Volver</button>
+    <div class="d-flex justify-content-between align-items-center mb-4 sticky-sub-header bg-body pt-2 pb-2" style="top: 70px; z-index: 10;">
+        <h3 id="tituloCategoria" class="text-primary fw-bold m-0">Productos</h3>
+        <button class="btn btn-outline-secondary btn-sm rounded-pill" onclick="irASeccion('portada')">
+            <i class="bi bi-arrow-left me-1"></i> Atrás
+        </button>
     </div>
-    <div class="row g-4" id="listaProductos"></div>
+    <div class="row g-3" id="listaProductos">
+        </div>
   </div>
 
   <div id="carrito" class="seccion">
-    <div class="card p-4 border-0">
-      <h3 class="mb-4 text-primary"><i class="bi bi-cart4 me-2"></i>Tu Carrito</h3>
-      <div class="table-responsive mb-4">
-        <table class="table align-middle">
-          <thead class="table-light">
+    <div class="card p-3 p-md-4 border-0 shadow-sm rounded-4">
+      <h3 class="mb-4 text-primary fw-bold"><i class="bi bi-cart4 me-2"></i>Tu Carrito</h3>
+      
+      <div class="table-responsive mb-4 rounded-3 border">
+        <table class="table align-middle table-hover mb-0">
+          <thead class="bg-light">
             <tr>
-              <th scope="col" class="py-3 ps-3">Producto</th>
-              <th scope="col" class="text-center py-3">Precio</th>
-              <th scope="col" class="text-center py-3">Cantidad</th>
-              <th scope="col" class="text-center py-3">Total</th>
-              <th scope="col" class="text-center py-3"></th>
+              <th class="py-3 ps-3">Detalle</th>
+              <th class="text-center py-3">Precio</th>
+              <th class="text-center py-3">Cant.</th>
+              <th class="text-center py-3">Total</th>
+              <th></th>
             </tr>
           </thead>
-          <tbody id="listaCarrito">
-            <tr><td colspan="5" class="text-center text-muted py-5">El carrito está vacío.</td></tr>
-          </tbody>
+          <tbody id="listaCarrito"></tbody>
           <tfoot class="border-top">
             <tr>
-              <td colspan="3" class="text-end fw-bold fs-5 py-3">Total Estimado:</td>
+              <td colspan="3" class="text-end fw-bold py-3">Total:</td>
               <td class="text-center fw-bold fs-5 text-primary py-3" id="totalCarrito">RD$0.00</td>
               <td></td>
             </tr>
           </tfoot>
         </table>
       </div>
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-        <button class="btn btn-outline-danger btn-sm" onclick="vaciarCarrito()">Vaciar Carrito</button>
-        
-        <div class="d-flex flex-wrap gap-2 justify-content-end">
-            <button class="btn btn-secondary" onclick="irASeccion('portada')">Volver al Catálogo</button>
-            
-            <button class="btn btn-dark shadow px-3" onclick="solicitarConfirmacion('imprimir_descargar')">
-                <i class="bi bi-printer-fill me-2"></i> Cotizar Articulos del Carrito
-            </button>
 
-            <button class="btn btn-success shadow px-3" onclick="solicitarConfirmacion('whatsapp')">
-                <i class="bi bi-whatsapp me-2"></i> Enviar Cotización por WhatsApp
+      <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+        <button class="btn btn-outline-danger rounded-pill" onclick="vaciarCarrito()">
+            <i class="bi bi-trash"></i> Vaciar
+        </button>
+        <div class="d-flex flex-column flex-md-row gap-2">
+            <button class="btn btn-secondary rounded-pill" onclick="irASeccion('portada')">Seguir comprando</button>
+            <button class="btn btn-dark rounded-pill shadow" onclick="solicitarConfirmacion('imprimir_descargar')">
+                <i class="bi bi-file-earmark-pdf-fill me-2"></i> Descargar Cotización
+            </button>
+            <button class="btn btn-success rounded-pill shadow animate-pulse" onclick="solicitarConfirmacion('whatsapp')">
+                <i class="bi bi-whatsapp me-2"></i> Pedir por WhatsApp
             </button>
         </div>
       </div>
-      <div class="mt-3 text-end text-muted small fst-italic">
-        * Al cotizar, obtendrás un número de turno en nuestra lista de espera.
-      </div>
+      <p class="mt-3 text-center text-muted small fst-italic">
+        * Al finalizar, recibirás un número de turno para tu pedido.
+      </p>
     </div>
   </div>
 
   <div id="adminPanel" class="seccion">
-    <div class="card p-4 border-0">
+    <div class="card p-3 p-md-4 border-0 shadow-sm rounded-4">
       <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 class="mb-0 text-primary"><i class="bi bi-gear-wide-connected me-2"></i>Administración</h3>
-        <button class="btn btn-sm btn-outline-danger" onclick="cerrarSesion()">Salir de la cuenta</button>
+        <h4 class="mb-0 text-primary fw-bold">Panel Admin</h4>
+        <button class="btn btn-sm btn-outline-danger rounded-pill" onclick="cerrarSesion()">Salir</button>
       </div>
       
-      <ul class="nav nav-pills mb-4 gap-2" role="tablist">
+      <ul class="nav nav-pills nav-fill mb-4 gap-2 p-1 bg-light rounded-pill" role="tablist">
         <li class="nav-item">
-          <button class="nav-link active px-4" data-bs-toggle="tab" data-bs-target="#adminCategorias" onclick="cargarCategoriasAdmin()">Categorías</button>
+          <button class="nav-link active rounded-pill" data-bs-toggle="tab" data-bs-target="#adminCategorias" onclick="cargarCategoriasAdmin()">Categorías</button>
         </li>
         <li class="nav-item">
-          <button class="nav-link px-4" data-bs-toggle="tab" data-bs-target="#adminProductos" onclick="cargarProductosAdmin()">Productos</button>
+          <button class="nav-link rounded-pill" data-bs-toggle="tab" data-bs-target="#adminProductos" onclick="cargarProductosAdmin()">Productos</button>
         </li>
         <li class="nav-item">
-          <button class="nav-link px-4 position-relative" data-bs-toggle="tab" data-bs-target="#adminPedidos" onclick="cargarPedidosAdmin()">
-            Pedidos / Cola
-            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="badgeColaAdmin">0</span>
+          <button class="nav-link rounded-pill position-relative" data-bs-toggle="tab" data-bs-target="#adminPedidos" onclick="cargarPedidosAdmin()"> 
+            Pedidos <span class="position-absolute top-0 start-100 translate-middle badge rounded-circle bg-danger" id="badgeColaAdmin">0</span>
           </button>
         </li>
       </ul>
 
-      <div class="tab-content bg-white p-3 rounded-3 shadow-sm border">
+      <div class="tab-content">
         <div class="tab-pane fade show active" id="adminCategorias">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-              <h5 class="mb-0">Listado de Categorías</h5>
-              <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalCategoria" onclick="prepararFormularioCategoria()"><i class="bi bi-plus-lg"></i> Nueva</button>
+          <button class="btn btn-primary w-100 mb-3 rounded-pill" onclick="abrirModalCategoria()">
+            <i class="bi bi-plus-circle"></i> Nueva Categoría
+          </button>
+          <div class="table-responsive rounded-3 border">
+            <table class="table table-hover mb-0">
+                <thead class="table-light"><tr><th>Img</th><th>Nombre</th><th>Acciones</th></tr></thead>
+                <tbody id="tablaCategoriasAdmin"></tbody>
+            </table>
           </div>
-          <table class="table table-hover">
-            <thead><tr><th>Nombre</th><th>Items</th><th class="text-end">Acciones</th></tr></thead>
-            <tbody id="listaCategoriasAdmin"></tbody>
-          </table>
         </div>
-
+        
         <div class="tab-pane fade" id="adminProductos">
-           <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-              <h5 class="mb-0">Inventario</h5>
-              <div class="d-flex gap-2">
-                  <input type="text" id="adminSearchProd" class="form-control form-control-sm" placeholder="Buscar..." oninput="buscarProductoAdmin()">
-                  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalProducto" onclick="prepararFormularioProducto()"><i class="bi bi-plus-lg"></i> Nuevo</button>
-              </div>
+          <button class="btn btn-primary w-100 mb-3 rounded-pill" onclick="abrirModalProducto()">
+            <i class="bi bi-plus-circle"></i> Nuevo Producto
+          </button>
+          <div class="table-responsive rounded-3 border">
+            <table class="table table-hover mb-0">
+                <thead class="table-light"><tr><th>Img</th><th>Producto</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <tbody id="tablaProductosAdmin"></tbody>
+            </table>
           </div>
-          <table class="table table-hover align-middle">
-            <thead><tr><th>Categoría</th><th>Producto</th><th>Estado</th><th>Precio</th><th class="text-end">Acciones</th></tr></thead>
-            <tbody id="listaProductosAdmin"></tbody>
-          </table>
         </div>
 
         <div class="tab-pane fade" id="adminPedidos">
-            <div class="row">
-                <div class="col-12 mb-4">
-                    <div class="card bg-light border-primary border-2">
-                        <div class="card-header bg-primary text-white fw-bold">
-                            <i class="bi bi-hourglass-split me-2"></i> Cola de Espera (Pendientes)
-                        </div>
-                        <div class="card-body p-0">
-                            <div class="table-responsive">
-                                <table class="table table-striped mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>Turno Actual</th>
-                                            <th>Cliente</th>
-                                            <th>Fecha</th>
-                                            <th>Total</th>
-                                            <th class="text-end">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="listaPedidosPendientes"></tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-12">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                         <h5 class="text-muted"><i class="bi bi-check-circle-fill me-2"></i>Historial de Completados</h5>
-                         <button class="btn btn-sm btn-outline-danger" onclick="borrarHistorialCompleto()"><i class="bi bi-trash"></i> Borrar Historial</button>
-                    </div>
-                    <div class="table-responsive" style="max-height: 400px; overflow-y:auto;">
-                        <table class="table table-hover align-middle text-muted">
-                          <thead>
-                              <tr>
-                                  <th>ID</th>
-                                  <th>Fecha</th>
-                                  <th>Cliente</th>
-                                  <th>Total</th>
-                                  <th class="text-end">Info</th>
-                              </tr>
-                          </thead>
-                          <tbody id="listaPedidosCompletados"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-          </div>
+           <div class="d-flex justify-content-between align-items-center mb-3">
+               <h5 class="mb-0">Cola de Pedidos</h5>
+               <button class="btn btn-sm btn-outline-primary rounded-pill" onclick="cargarPedidosAdmin()"><i class="bi bi-arrow-clockwise"></i> Refrescar</button>
+           </div>
+           <div class="row g-3" id="listaPedidosAdmin"></div>
+        </div>
       </div>
     </div>
   </div>
 
   <div id="contacto" class="seccion">
-    <div class="card p-5 text-center border-0">
-      <h3 class="mb-4">Contáctanos</h3>
-      <p>Para consultas, pedidos personalizados o más información, no dudes en contactarnos.</p>
-      <a href="http://wa.me/18096659100" class="btn btn-success mb-3"><i class="bi bi-whatsapp"></i> WhatsApp</a>
-      <a href="https://www.instagram.com/mariposas_cuties.rd/" class="btn btn-danger mb-3"><i class="bi bi-instagram"></i> Instagram</a>
-      <a href="https://maps.google.com/?q=Salcedo-Tenares" class="btn btn-primary mb-3"><i class="bi bi-geo-alt"></i> Ubicación</a>
+    <div class="row justify-content-center text-center">
+        <div class="col-md-6">
+            <div class="card p-5 border-0 shadow-sm rounded-4">
+                <i class="bi bi-chat-heart fs-1 text-primary mb-3"></i>
+                <h2 class="fw-bold">Contáctanos</h2>
+                <p class="text-muted">Estamos para servirte y personalizar tus ideas.</p>
+                <div class="d-grid gap-3 mt-4">
+                    <a href="https://wa.me/18090000000" target="_blank" class="btn btn-success btn-lg rounded-pill">
+                        <i class="bi bi-whatsapp me-2"></i> Escríbenos al WhatsApp
+                    </a>
+                    <a href="tel:8090000000" class="btn btn-outline-primary btn-lg rounded-pill">
+                        <i class="bi bi-telephone me-2"></i> Llamar ahora
+                    </a>
+                </div>
+                <button class="btn btn-link mt-4 text-muted" onclick="irASeccion('portada')">Volver al inicio</button>
+            </div>
+        </div>
+    </div>
+  </div>
+
+</div>
+
+<footer class="bg-white py-4 mt-auto border-top">
+    <div class="container text-center">
+        <div class="mb-3">
+            <i class="bi bi-stars text-primary"></i> 
+            <span class="fw-bold text-dark">Mariposas Cuties</span>
+        </div>
+        <p class="text-muted small mb-2">Personalizamos tus ideas con amor.</p>
+        
+        <div class="d-inline-block bg-light px-3 py-1 rounded-pill border shadow-sm mt-2">
+            <small class="text-muted fw-bold">
+                <i class="bi bi-eye-fill me-1 text-primary"></i> Visitas: 
+                <span id="contador-visitas" class="text-dark">Cargando...</span>
+            </small>
+        </div>
+        
+        <div class="mt-3 small text-muted">
+            &copy; 2024 Todos los derechos reservados.
+        </div>
+    </div>
+</footer>
+
+<a href="https://wa.me/18090000000" class="btn-whatsapp-float shadow-lg" target="_blank" title="Contáctanos por WhatsApp">
+    <i class="bi bi-whatsapp"></i>
+</a>
+
+<div class="modal fade" id="modalProductoDetalle" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg"> <div class="modal-content border-0 rounded-4 overflow-hidden">
+      <div class="row g-0">
+          <div class="col-md-6 bg-light d-flex align-items-center justify-content-center p-3">
+             <img src="" id="detalleImg" class="img-fluid rounded-3 shadow-sm" style="max-height: 350px;">
+          </div>
+          <div class="col-md-6">
+              <div class="modal-header border-0 pb-0">
+                  <span class="badge bg-primary-subtle text-primary rounded-pill px-3" id="detalleCat">Categoría</span>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body p-4">
+                  <h3 class="fw-bold mb-2" id="detalleNombre">Nombre Producto</h3>
+                  <h2 class="text-primary fw-bold mb-3" id="detallePrecio">RD$ 0.00</h2>
+                  <div id="detalleEstado" class="mb-3"></div>
+                  <p class="text-muted" id="detalleDesc">Descripción...</p>
+              </div>
+              <div class="modal-footer border-0 p-4 pt-0">
+                  <button type="button" class="btn btn-primary w-100 py-2 rounded-pill shadow-sm" id="btnAgregarDetalle">
+                      Agregar al Carrito
+                  </button>
+              </div>
+          </div>
+      </div>
     </div>
   </div>
 </div>
 
-
-<div class="modal fade" id="modalProductoDetalle" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content border-0 shadow-lg overflow-hidden" style="border-radius: 20px;">
-      <div class="position-relative">
-          <button type="button" class="btn-close position-absolute top-0 end-0 m-3 z-3 bg-white p-2 rounded-circle shadow-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="modal fade" id="modalDatosInvitado" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4 border-0">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold">Datos para el Pedido</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body p-0">
-        <div class="row g-0">
-          <div class="col-md-6 bg-light d-flex align-items-center justify-content-center">
-            <img id="detalleImg" src="" class="img-fluid w-100 object-fit-cover" style="height: 100%; max-height: 450px;" alt="Producto">
-          </div>
-          <div class="col-md-6 p-4 p-md-5 d-flex flex-column justify-content-center">
-            <span id="detalleCat" class="badge bg-purple-light text-primary mb-2 align-self-start" style="background: #f3e5f5;">Categoría</span>
-            <h2 id="detalleNombre" class="fw-bold mb-2 text-dark">Nombre del Producto</h2>
-            
-            <h3 id="detallePrecio" class="text-primary fw-bold mb-3 fs-1">$0.00</h3>
-            
-            <h6 class="fw-bold text-muted">Descripción</h6>
-            <p id="detalleDesc" class="text-muted mb-4 small" style="line-height: 1.6;">
-              Aquí va la descripción del producto...
-            </p>
-
-            <div class="mb-4">
-                <span id="detalleEstado" class="d-flex align-items-center fw-bold text-success">
-                    <i class="bi bi-box-seam me-2"></i> Disponible
-                </span>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">Necesitamos estos datos para identificar tu orden en la fila.</p>
+        <form id="formInvitado">
+            <div class="form-floating mb-2">
+                <input type="text" class="form-control rounded-3" id="invNombre" placeholder="Nombre" required>
+                <label>Nombre</label>
             </div>
-
-            <div class="d-grid mt-auto">
-              <button id="btnAgregarDetalle" class="btn btn-primary py-3 fw-bold rounded-pill shadow-sm">
-                <i class="bi bi-bag-plus-fill me-2"></i> Agregar al carrito para personalizar
-              </button>
-              <p class="text-center text-muted mt-3 small mb-0">Contáctanos para personalizar este producto a tu gusto</p>
+            <div class="form-floating mb-2">
+                <input type="text" class="form-control rounded-3" id="invApellido" placeholder="Apellido" required>
+                <label>Apellido</label>
             </div>
-          </div>
+            <div class="form-floating mb-2">
+                <input type="tel" class="form-control rounded-3" id="invTelefono" placeholder="Teléfono" required>
+                <label>Teléfono / Celular</label>
+            </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-primary w-100 rounded-pill" onclick="confirmarDatosInvitado()">Confirmar Pedido</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalConfirmacion" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4 border-0">
+      <div class="modal-body text-center p-4">
+        <i class="bi bi-question-circle-fill text-warning display-1 mb-3"></i>
+        <h4 class="fw-bold">¿Estás seguro?</h4>
+        <p class="text-muted" id="textoConfirmacion">...</p>
+        <div class="d-flex justify-content-center gap-2 mt-4">
+            <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-primary rounded-pill px-4" id="btnConfirmarAccion">Sí, confirmar</button>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalExitoOrden" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4 border-0">
+      <div class="modal-body text-center p-5">
+        <div class="mb-3 text-success animate-pulse">
+            <i class="bi bi-check-circle-fill display-1"></i>
+        </div>
+        <h2 class="fw-bold text-success">¡Pedido Recibido!</h2>
+        <p class="lead text-dark">Tu número de turno es:</p>
+        <div class="display-3 fw-bold text-primary my-3 p-3 bg-light rounded-3 border border-primary border-dashed" id="numeroTurnoExito">#0</div>
+        <p class="text-muted small">Guarda este número. Te contactaremos pronto.</p>
+        <button type="button" class="btn btn-outline-dark rounded-pill mt-3 px-5" data-bs-dismiss="modal" onclick="vaciarCarrito()">Entendido</button>
       </div>
     </div>
   </div>
@@ -383,295 +443,51 @@
 
 <div class="modal fade" id="modalCategoria" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-light">
-        <h5 class="modal-title fw-bold" id="modalCategoriaTitulo">Gestión Categoría</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-content rounded-4">
+      <div class="modal-header"><h5 class="modal-title">Gestión Categoría</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+          <input type="hidden" id="catId">
+          <div class="mb-3"><label>Nombre</label><input type="text" class="form-control" id="catNombre"></div>
+          <div class="mb-3"><label>URL Imagen</label><input type="text" class="form-control" id="catImg"></div>
+          <button class="btn btn-primary w-100 rounded-pill" onclick="guardarCategoria()">Guardar</button>
       </div>
-      <form onsubmit="event.preventDefault(); guardarCategoria();">
-        <div class="modal-body">
-          <input type="hidden" id="catIndex">
-          <div class="mb-3">
-            <label class="form-label">Nombre</label>
-            <input type="text" id="catNombre" class="form-control" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">URL Imagen</label>
-            <input type="url" id="catImg" class="form-control" required>
-          </div>
-        </div>
-        <div class="modal-footer border-0">
-          <button type="submit" class="btn btn-primary px-4">Guardar</button>
-        </div>
-      </form>
     </div>
   </div>
 </div>
 
 <div class="modal fade" id="modalProducto" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-light">
-        <h5 class="modal-title fw-bold" id="modalProductoTitulo">Gestión Producto</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-content rounded-4">
+      <div class="modal-header"><h5 class="modal-title">Gestión Producto</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+          <input type="hidden" id="prodId">
+          <div class="mb-2"><label>Categoría</label><select class="form-select" id="prodCatId"></select></div>
+          <div class="mb-2"><label>Nombre</label><input type="text" class="form-control" id="prodNombre"></div>
+          <div class="mb-2"><label>Precio</label><input type="number" class="form-control" id="prodPrecio"></div>
+          <div class="mb-2"><label>URL Imagen</label><input type="text" class="form-control" id="prodImg"></div>
+          <div class="mb-2"><label>Descripción</label><textarea class="form-control" id="prodDesc" rows="2"></textarea></div>
+          <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" id="prodDisponible" checked>
+              <label class="form-check-label">Disponible</label>
+          </div>
+          <button class="btn btn-primary w-100 rounded-pill" onclick="guardarProducto()">Guardar</button>
       </div>
-      <form onsubmit="event.preventDefault(); guardarProducto();">
-        <div class="modal-body">
-          <input type="hidden" id="prodCatIndex"><input type="hidden" id="prodIndex">
-          
-          <div class="mb-3">
-            <label class="form-label fw-bold small">Categoría</label>
-            <select id="prodCategoria" class="form-select" required></select>
-          </div>
-          
-          <div class="mb-3">
-            <label class="form-label fw-bold small">Nombre Producto</label>
-            <input type="text" id="prodNombre" class="form-control" required>
-          </div>
-
-          <div class="mb-3">
-              <label class="form-label fw-bold small">Descripción</label>
-              <textarea id="prodDesc" class="form-control" rows="3" placeholder="Detalles del producto, material, capacidad..."></textarea>
-          </div>
-
-          <div class="row">
-            <div class="col-6 mb-3">
-                <label class="form-label fw-bold small">Precio (RD$)</label>
-                <input type="number" id="prodPrecio" class="form-control" step="0.01" min="0.01" required>
-            </div>
-            <div class="col-6 mb-3">
-                <label class="form-label fw-bold small">Estado</label>
-                <select id="prodDisp" class="form-select">
-                    <option value="true">Disponible</option>
-                    <option value="false">Agotado</option>
-                </select>
-            </div>
-          </div>
-          
-          <div class="mb-3">
-             <label class="form-label fw-bold small">URL Imagen</label>
-             <input type="url" id="prodImg" class="form-control" required>
-          </div>
-        </div>
-        <div class="modal-footer border-0">
-          <button type="submit" class="btn btn-primary px-4 rounded-pill">Guardar Cambios</button>
-        </div>
-      </form>
     </div>
   </div>
-</div>
-
-<div class="modal fade" id="modalConfirmacion" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header border-0 pb-0">
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body text-center pb-4">
-                <div class="mb-3 text-warning"><i class="bi bi-exclamation-circle fs-1"></i></div>
-                <h4 class="mb-3">¿Estás seguro?</h4>
-                <p id="textoConfirmacion" class="text-muted mb-4">Deseas realizar esta acción. La factura se guardará en tu historial.</p>
-                <div class="d-flex justify-content-center gap-2">
-                    <button class="btn btn-light px-4" data-bs-dismiss="modal">Cancelar</button>
-                    <button id="btnConfirmarAccion" class="btn btn-primary px-4">Sí, continuar</button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="modalExitoOrden" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title">¡Orden Realizada Exitosamente!</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body text-center py-5">
-                <div class="mb-3"><i class="bi bi-check-circle-fill display-1 text-success"></i></div>
-                <h4>Su número de orden es:</h4>
-                <div class="display-3 fw-bold text-primary my-3" id="numeroTurnoExito">#0</div>
-                <p class="text-muted">Pronto nos comunicaremos con usted para gestionar su pedido.</p>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-primary w-100" data-bs-dismiss="modal">Entendido</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="modalDatosInvitado" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header bg-primary text-white">
-          <h5 class="modal-title">Datos para la Factura</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-            <p class="small text-muted mb-3">Ingresa tus datos para generar la orden y asignarte un turno.</p>
-            <form id="formInvitado" onsubmit="event.preventDefault(); confirmarDatosInvitado();">
-                <div class="mb-3">
-                    <label class="form-label fw-bold small">Nombre</label>
-                    <input type="text" id="invNombre" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-bold small">Apellido</label>
-                    <input type="text" id="invApellido" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-bold small">WhatsApp / Teléfono</label>
-                    <input type="tel" id="invTelefono" class="form-control" required>
-                </div>
-                <div class="d-grid">
-                    <button type="submit" class="btn btn-primary">Confirmar y Generar</button>
-                </div>
-            </form>
-        </div>
-      </div>
-    </div>
-</div>
-
-<div class="modal fade" id="modalDetallePedido" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-      <div class="modal-content">
-        <div class="modal-header bg-warning text-dark">
-          <h5 class="modal-title fw-bold">Detalle del Pedido</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body" id="cuerpoDetallePedido"></div>
-        <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-            <button class="btn btn-dark" onclick="reimprimirPedidoDesdeModal()">Imprimir Copia</button>
-        </div>
-      </div>
-    </div>
 </div>
 
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
-  <div id="liveToast" class="toast align-items-center text-white bg-primary border-0" role="alert">
+  <div id="liveToast" class="toast align-items-center text-bg-dark border-0 rounded-pill" role="alert" aria-live="assertive" aria-atomic="true">
     <div class="d-flex">
-      <div class="toast-body fs-6" id="toastBody"></div>
-      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      <div class="toast-body px-4" id="toastBody">
+        Notificación
+      </div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
     </div>
   </div>
 </div>
 
-<footer class="bg-primary-gradient text-white py-4 mt-5">
-  <div class="container">
-    <div class="row">
-      <div class="col-md-4">
-        <h5>Mariposas Cuties</h5>
-        <p>Somos tu mejor opción en productos personalizados. Explora nuestro catálogo y genera cotizaciones al instante.</p>
-        <div>
-          <a href="https://www.facebook.com/profile.php?id=100063945973270" class="text-white me-2"><i class="bi bi-facebook"></i></a>
-          <a href="https://www.instagram.com/mariposas_cuties.rd/" class="text-white me-2"><i class="bi bi-instagram"></i></a>
-          <a href="http://wa.me/18096659100" class="text-white"><i class="bi bi-whatsapp"></i></a>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <h5>Enlaces Rápidos</h5>
-        <ul class="list-unstyled">
-          <li><a href="#" onclick="irASeccion('portada')" class="text-white">Inicio</a></li>
-          <li><a href="#" onclick="irASeccion('carrito')" class="text-white">Carrito de Compras</a></li>
-          <li><a href="#" onclick="irASeccion('contacto')" class="text-white">Contáctanos</a></li>
-        </ul>
-      </div>
-      <div class="col-md-4">
-        <h5>Información de Contactos</h5>
-        <p><i class="bi bi-geo-alt"></i> C/Salcedo-Tenares, Entrada los Platanitos</p>
-        <p><i class="bi bi-phone"></i> 809-665-9100 / 829-827-3753</p>
-        <p><i class="bi bi-credit-card"></i> Aceptamos Efectivo y Transferencia</p>
-      </div>
-    </div>
-    <hr class="bg-white">
-    <p class="text-center mb-0 small">&copy; 2026 Mariposas Cuties. Todos los derechos reservados.</p>
-  </div>
-</footer>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="script.js"></script>
-
-<!-- Canvas para los corazones cayendo -->
-<canvas id="heartsCanvas" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999;"></canvas>
-
-<script>
-// ============ EFECTO DE CORAZONES CAYENDO (Mes del Amor) ============
-const canvas = document.getElementById('heartsCanvas');
-const ctx = canvas.getContext('2d');
-
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-window.addEventListener('resize', () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-});
-
-const hearts = [];
-const heartCount = 15; // Puedes aumentar o bajar (30-50 queda bien)
-
-class Heart {
-    constructor() {
-        this.x = Math.random() * canvas.width;
-        this.y = Math.random() * -100;
-        this.size = Math.random() * 15 + 10;
-        this.speedY = Math.random() * 1.5 + 0.5; // Caen lento
-        this.speedX = Math.random() * 1 - 0.5; // Desvío horizontal suave
-        this.rotation = Math.random() * Math.PI * 2;
-        this.rotationSpeed = Math.random() * 0.05 - 0.025;
-        this.opacity = Math.random() * 0.5 + 0.5;
-    }
-
-    draw() {
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.rotation);
-        ctx.globalAlpha = this.opacity;
-        ctx.fillStyle = '#ff1493'; // Rosa fuerte (puedes cambiar a #ff69b4, #e91e63, etc.)
-
-        // Forma de corazón
-        ctx.beginPath();
-        ctx.moveTo(0, this.size / 4);
-        ctx.bezierCurveTo(-this.size / 2, -this.size / 2, -this.size, -this.size / 4, -this.size / 4, this.size / 2);
-        ctx.bezierCurveTo(-this.size / 8, this.size, 0, this.size / 1.5, 0, this.size / 1.5);
-        ctx.bezierCurveTo(0, this.size / 1.5, this.size / 8, this.size, this.size / 4, this.size / 2);
-        ctx.bezierCurveTo(this.size, -this.size / 4, this.size / 2, -this.size / 2, 0, this.size / 4);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.restore();
-    }
-
-    update() {
-        this.y += this.speedY;
-        this.x += this.speedX;
-        this.rotation += this.rotationSpeed;
-
-        if (this.y > canvas.height + this.size) {
-            this.y = -this.size;
-            this.x = Math.random() * canvas.width;
-        }
-    }
-}
-
-// Crear corazones
-for (let i = 0; i < heartCount; i++) {
-    hearts.push(new Heart());
-}
-
-function animate() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    hearts.forEach(heart => {
-        heart.update();
-        heart.draw();
-    });
-    requestAnimationFrame(animate);
-}
-
-animate();
-// ============ FIN DEL EFECTO ============
-</script>
-
 </body>
 </html>
-
