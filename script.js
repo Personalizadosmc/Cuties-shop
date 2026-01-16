@@ -236,13 +236,26 @@ async function cargarCategorias() {
 async function cargarCategoriaMenu() {
   const m = document.getElementById('categoriaMenu'); if(!m) return;
   m.innerHTML = ''; 
-  // AQUÍ AGREGAMOS LA CLASE text-white fw-bold PARA QUE EL MENÚ RESALTE
-  categorias.forEach(cat => m.innerHTML += `<li class="nav-item"><a class="nav-link text-white fw-bold" href="#" onclick="verProductos('${cat.nombre}')">${cat.nombre}</a></li>`);
+  // Creamos los botones con un ID único para poder pintarlos luego
+  categorias.forEach(cat => {
+      m.innerHTML += `<li class="nav-item">
+        <a class="nav-link text-white fw-bold" id="menu-btn-${cat.id}" href="#" onclick="verProductos('${cat.nombre}')">${cat.nombre}</a>
+      </li>`;
+  });
 }
 
 function verProductos(nom) {
   const cat = categorias.find(c => c.nombre === nom);
-  if (cat) mostrarProductosEnSeccion(cat.nombre, cat.productos);
+  if (cat) {
+      mostrarProductosEnSeccion(cat.nombre, cat.productos);
+      
+      // LOGICA NUEVA: Resaltar botón activo
+      // 1. Quitar clase active-cat de todos
+      document.querySelectorAll('.nav-link').forEach(btn => btn.classList.remove('active-cat'));
+      // 2. Agregar clase al seleccionado
+      const btnActivo = document.getElementById(`menu-btn-${cat.id}`);
+      if(btnActivo) btnActivo.classList.add('active-cat');
+  }
 }
 
 function mostrarProductosEnSeccion(tit, prods) {
@@ -444,8 +457,7 @@ function imprimirFactura(p, turno, win) {
         ? `<div><strong>ORDEN #${p.id}</strong><br>TURNO ACTUAL: <span style="font-size:18px;font-weight:bold;">#${turno || '?'}</span></div>`
         : `<div><strong>ORDEN #${p.id}</strong><br>ESTADO: ENTREGADO</div>`;
 
-    const fechaImpresion = new Date().toLocaleString('es-DO');
-
+    // ELIMINÉ LA FECHA DEL PIE DE PÁGINA COMO PEDISTE
     win.document.open();
     win.document.write(`
     <html><head><title>Cotización #${p.id}</title>
@@ -460,7 +472,6 @@ function imprimirFactura(p, turno, win) {
       th { background: #6a1b9a; color: white; padding: 8px; text-align: left; }
       .total { text-align: right; font-size: 20px; font-weight: bold; color: #6a1b9a; }
       .footer { text-align: center; margin-top: 60px; font-size: 14px; color: #555; font-weight: bold; }
-      .footer-date { font-size: 10px; color: #999; margin-top: 5px; font-weight: normal; }
       @media print { button { display: none; } }
       .btn-bar { text-align:center; margin-bottom:15px; background:#f0f0f0; padding:10px; border-radius:8px; }
       .btn { padding:10px 20px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; margin:0 5px; }
@@ -482,7 +493,7 @@ function imprimirFactura(p, turno, win) {
       </div>
       <table><thead><tr><th>Producto</th><th style="text-align:center;">Cant.</th><th style="text-align:right;">Precio</th><th style="text-align:right;">Total</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="total">Total a Pagar: ${formatearRD(p.total)}</div>
-      <div class="footer">¡Gracias por preferirnos! ❤️<div class="footer-date">Impreso el: ${fechaImpresion}</div></div>
+      <div class="footer">¡Gracias por preferirnos! ❤️</div>
     </body></html>`);
     win.document.close();
 }
@@ -652,3 +663,4 @@ async function delCat(id){ if(confirm("¿Borrar?")) {await supabaseClient.from('
 function prepProd(cid,pid){ const s=document.getElementById('prodCatId');s.innerHTML='';categorias.forEach(c=>s.innerHTML+=`<option value="${c.id}">${c.nombre}</option>`); document.getElementById('prodId').value=pid||''; if(pid){const p=categorias.find(c=>c.id==cid).productos.find(x=>x.id==pid);s.value=cid;document.getElementById('prodNombre').value=p.nombre;document.getElementById('prodPrecio').value=p.precio;document.getElementById('prodImg').value=p.img;document.getElementById('prodDesc').value=p.descripcion||'';document.getElementById('prodDisponible').checked=p.disponible;}else{document.getElementById('prodNombre').value='';document.getElementById('prodPrecio').value='';document.getElementById('prodImg').value='';document.getElementById('prodDesc').value='';}}
 async function guardarProducto(){ const id=document.getElementById('prodId').value,cid=document.getElementById('prodCatId').value,n=document.getElementById('prodNombre').value,p=document.getElementById('prodPrecio').value,i=document.getElementById('prodImg').value,d=document.getElementById('prodDesc').value,disp=document.getElementById('prodDisponible').checked; if(!n)return; const pay={category_id:cid,nombre:n,precio:p,img:i,descripcion:d,disponible:disp}; const {error}=id?await supabaseClient.from('productos').update(pay).eq('id',id):await supabaseClient.from('productos').insert(pay); if(!error){modalProductoInst.hide();cargarProductosAdmin();} }
 async function delProd(id){ if(confirm("¿Borrar?")) {await supabaseClient.from('productos').delete().eq('id',id);cargarProductosAdmin();} }
+
