@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await cargarCategoriaMenu();
   actualizarInterfaz();
   await irASeccion('portada');
-  iniciarContadorVisitasHoy(); // Nueva función solo para HOY
+  iniciarContadorVisitasHoy();
   
   setTimeout(() => {
       const loader = document.getElementById('loader-overlay');
@@ -51,21 +51,20 @@ function inicializarComponentesBootstrap() {
   if(document.getElementById('modalProductoDetalle')) modalDetalleInst = new bootstrap.Modal(document.getElementById('modalProductoDetalle'));
 }
 
-// ================= VISITAS (SOLO HOY) =================
+// ================= VISITAS (HOY) =================
 async function iniciarContadorVisitasHoy() {
     const el = document.getElementById('contador-visitas');
     if (!el) return;
 
     try {
-        // 1. Insertar visita nueva
         await supabaseClient.from('visitas').insert({});
         
-        // 2. Calcular inicio del día en formato ISO
+        // Calcular inicio del día (00:00:00)
         const hoy = new Date();
         hoy.setHours(0, 0, 0, 0);
         const hoyISO = hoy.toISOString();
 
-        // 3. Contar solo las que sean mayores o iguales a hoy 00:00
+        // Contar visitas desde hoy
         const { count, error } = await supabaseClient
             .from('visitas')
             .select('*', { count: 'exact', head: true })
@@ -74,10 +73,10 @@ async function iniciarContadorVisitasHoy() {
         if (!error && count !== null) {
             el.innerText = count.toLocaleString();
         } else {
-            el.innerText = "1"; // Fallback
+            el.innerText = "1";
         }
     } catch (e) {
-        console.warn("Error contador visitas:", e);
+        console.warn("Error visitas:", e);
         el.innerText = "+100";
     }
 }
@@ -122,9 +121,7 @@ function actualizarContadorCarrito() {
   const c = getCarrito();
   const total = c.reduce((s, i) => s + i.cantidad, 0);
   
-  // Actualizamos TODOS los elementos que tengan la clase cartCountNav (Navbar y Botón Flotante)
   const badges = document.querySelectorAll('.cartCountNav');
-  
   badges.forEach(b => {
       b.innerText = total;
       if(total > 0) { 
@@ -139,7 +136,7 @@ function actualizarContadorCarrito() {
 
 function mostrarToast(msg) { document.getElementById('toastBody').innerText = msg; toastBootstrap.show(); }
 
-// ================= DATOS (SUPABASE) =================
+// ================= DATOS =================
 async function loadCategories() {
   const { data: cats, error } = await supabaseClient.from('categorias').select('*');
   if (error) return [];
@@ -479,7 +476,6 @@ async function confirmarBorrarTodo() {
     }
 }
 
-// Borrar pedido individual (ya conectado al botón rojo de la tarjeta)
 async function borrarPedidoUnico(id) {
     if(confirm('¿Eliminar este pedido permanentemente?')) {
         const { error } = await supabaseClient.from('pedidos').delete().eq('id', id);
@@ -511,18 +507,15 @@ async function cargarPedidosAdmin() {
   
   if(historialPedidos.length === 0) { container.innerHTML = '<div class="col-12 text-center text-muted">No hay pedidos.</div>'; return; }
 
-  // Filtros
   const pendientes = historialPedidos.filter(p => p.estado === 'pendiente'); 
   const completados = historialPedidos.filter(p => p.estado !== 'pendiente').sort((a,b) => b.id - a.id);
 
   let turnoVisual = 1;
 
-  // Render Pendientes
   pendientes.forEach(p => {
       container.innerHTML += crearCardPedidoAdmin(p, turnoVisual++, true, pendientes[0].id);
   });
 
-  // Render Completados
   if(completados.length > 0) {
       container.innerHTML += '<div class="col-12 mt-4 mb-2"><h6 class="border-bottom pb-2 text-muted">Historial Completados</h6></div>';
       completados.forEach(p => {
@@ -535,16 +528,16 @@ function crearCardPedidoAdmin(p, turno, esPendiente, primerIdPendiente) {
     const color = esPendiente ? 'border-warning border-start border-5' : 'border-success border-start border-5 opacity-75';
     const badge = esPendiente ? `<span class="badge bg-warning text-dark">Turno #${turno}</span>` : '<span class="badge bg-success">Completado</span>';
     
-    let btnAccion = '';
+    // BOTÓN COMPLETAR SOLO SI PENDIENTE
+    let btnCompletar = '';
     if(esPendiente) {
-        btnAccion = `<button class="btn btn-sm btn-success w-100 mt-2" onclick="marcarPedidoCompletado(${p.id}, ${primerIdPendiente})">✅ Completar Pedido</button>`;
+        btnCompletar = `<button class="btn btn-sm btn-success flex-grow-1" onclick="marcarPedidoCompletado(${p.id}, ${primerIdPendiente})">✅ Completar</button>`;
     }
 
     return `
     <div class="col-md-6 col-lg-4">
         <div class="card shadow-sm mb-3 ${color}">
-            <div class="card-body position-relative">
-                <button class="btn btn-sm text-danger position-absolute top-0 end-0 m-2" title="Eliminar este pedido" onclick="borrarPedidoUnico(${p.id})"><i class="bi bi-trash3-fill"></i></button>
+            <div class="card-body">
                 <div class="d-flex justify-content-between mb-2 align-items-center">
                     <span class="fw-bold text-muted small">ID: ${p.id}</span>
                     ${badge}
@@ -554,29 +547,33 @@ function crearCardPedidoAdmin(p, turno, esPendiente, primerIdPendiente) {
                 <p class="mb-1 text-muted small">${p.fechaStr} - ${p.horaStr}</p>
                 <h6 class="mt-2 fw-bold text-end">Total: ${formatearRD(p.total)}</h6>
                 <hr>
-                <div class="d-flex gap-2">
+                
+                <div class="d-flex gap-2 mb-2">
                     <button class="btn btn-sm btn-outline-dark flex-grow-1" onclick='buscarYVerDetalle(${p.id}, "${turno}")'><i class="bi bi-printer"></i> Factura</button>
+                    ${btnCompletar}
                 </div>
-                ${btnAccion}
+
+                <button class="btn btn-sm btn-outline-danger w-100" onclick="borrarPedidoUnico(${p.id})">
+                    <i class="bi bi-trash3-fill me-2"></i> Eliminar Pedido
+                </button>
+
             </div>
         </div>
     </div>`;
 }
 
-// LÓGICA DE ORDEN ESTRICTO
 async function marcarPedidoCompletado(id, idDeberiaSer) {
     if (id !== idDeberiaSer) {
         alert(`🚫 ¡ALTO!\n\nDebes completar los pedidos en orden de llegada.\nEl pedido que toca despachar es el ID #${idDeberiaSer}.`);
         return;
     }
-
     if(confirm('¿Pedido entregado? Pasará al historial.')) {
         await supabaseClient.from('pedidos').update({estado: 'completado'}).eq('id', id);
         cargarPedidosAdmin(); actualizarBadgeColaAdmin(); mostrarToast("Pedido completado.");
     }
 }
 
-// ================= CRUD ADMIN =================
+// ================= CRUD ADMIN (CAT/PROD) =================
 async function cargarCategoriasAdmin() {
   categorias = await loadCategories();
   const tb = document.getElementById('tablaCategoriasAdmin'); if(!tb) return;
@@ -585,13 +582,42 @@ async function cargarCategoriasAdmin() {
     tb.innerHTML += `<tr><td class="align-middle"><img src="${c.img}" style="width:40px;height:40px;object-fit:cover;border-radius:5px;"></td><td class="align-middle fw-bold">${c.nombre}</td><td class="text-end"><button class="btn btn-sm btn-light border me-1" onclick="prepCat(${c.id})" data-bs-toggle="modal" data-bs-target="#modalCategoria"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-danger" onclick="delCat(${c.id})"><i class="bi bi-trash"></i></button></td></tr>`;
   });
 }
+
+// CARGAR Y FILTRAR PRODUCTOS
 async function cargarProductosAdmin() {
-  categorias = await loadCategories();
-  const tb = document.getElementById('tablaProductosAdmin'); if(!tb) return;
+  // Carga inicial (o recarga desde DB)
+  if(categorias.length === 0) categorias = await loadCategories();
+  renderProductosAdmin(); // Renderiza todo por defecto
+}
+
+function filtrarProductosAdmin() {
+    renderProductosAdmin(); // Vuelve a renderizar aplicando el filtro del input
+}
+
+function renderProductosAdmin() {
+  const tb = document.getElementById('tablaProductosAdmin'); 
+  const query = document.getElementById('adminSearchInput').value.toLowerCase().trim();
+  
+  if(!tb) return;
   tb.innerHTML = '';
-  categorias.forEach(c => c.productos.forEach(p => {
-      tb.innerHTML += `<tr><td class="align-middle"><img src="${p.img}" style="width:40px;height:40px;object-fit:cover;"></td><td class="align-middle"><div>${p.nombre}</div><small class="text-muted">${c.nombre}</small></td><td class="align-middle">${formatearRD(p.precio)}</td><td class="align-middle">${p.disponible?'<span class="badge bg-success">Ok</span>':'<span class="badge bg-danger">Agotado</span>'}</td><td class="text-end"><button class="btn btn-sm btn-light border me-1" onclick="prepProd(${c.id},${p.id})" data-bs-toggle="modal" data-bs-target="#modalProducto"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-danger" onclick="delProd(${p.id})"><i class="bi bi-trash"></i></button></td></tr>`;
-  }));
+
+  categorias.forEach(c => {
+      c.productos.forEach(p => {
+          // Filtro: Si hay texto, ver si coincide con nombre. Si no hay texto, pasa todo.
+          if(query === '' || p.nombre.toLowerCase().includes(query)) {
+              tb.innerHTML += `<tr>
+                  <td class="align-middle"><img src="${p.img}" style="width:40px;height:40px;object-fit:cover;"></td>
+                  <td class="align-middle"><div>${p.nombre}</div><small class="text-muted">${c.nombre}</small></td>
+                  <td class="align-middle">${formatearRD(p.precio)}</td>
+                  <td class="align-middle">${p.disponible?'<span class="badge bg-success">Ok</span>':'<span class="badge bg-danger">Agotado</span>'}</td>
+                  <td class="text-end">
+                      <button class="btn btn-sm btn-light border me-1" onclick="prepProd(${c.id},${p.id})" data-bs-toggle="modal" data-bs-target="#modalProducto"><i class="bi bi-pencil"></i></button>
+                      <button class="btn btn-sm btn-danger" onclick="delProd(${p.id})"><i class="bi bi-trash"></i></button>
+                  </td>
+              </tr>`;
+          }
+      });
+  });
 }
 
 function prepCat(id){ document.getElementById('catId').value=id||''; if(id){const c=categorias.find(x=>x.id==id);document.getElementById('catNombre').value=c.nombre;document.getElementById('catImg').value=c.img;}else{document.getElementById('catNombre').value='';document.getElementById('catImg').value='';}}
