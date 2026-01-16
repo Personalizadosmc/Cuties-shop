@@ -20,21 +20,34 @@ function formatearRD(monto) {
   return 'RD$ ' + monto.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
-// ================= INICIALIZACIÓN =================
+// ================= INICIALIZACIÓN (DOM READY) =================
 document.addEventListener('DOMContentLoaded', async () => {
   inicializarComponentesBootstrap();
   
+  // 1. Registrar Visita (Invisible para el usuario, pero cuenta)
+  await registrarVisita();
+
+  // 2. Verificar Sesión
   if (usuarioActual) {
     const { data } = await supabaseClient.from('usuarios').select('*').eq('username', usuarioActual).single();
-    if (data) currentUser = data;
-    else { localStorage.removeItem('usuarioActual'); usuarioActual = null; }
+    if (data) {
+      currentUser = data;
+      // Solo si es ADMIN, cargamos y mostramos el contador
+      if(currentUser.role === 'admin') {
+          actualizarContadorVisualAdmin();
+      }
+    } else {
+      localStorage.removeItem('usuarioActual');
+      usuarioActual = null;
+    }
   }
   
-  await cargarCategoriaMenu();
+  // 3. Cargar Interfaz
+  await cargarCategoriaMenu(); // Ahora con texto blanco intenso
   actualizarInterfaz();
   await irASeccion('portada');
-  iniciarContadorVisitasHoy();
   
+  // 4. Quitar Loader
   setTimeout(() => {
       const loader = document.getElementById('loader-overlay');
       if(loader) { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 500); }
@@ -51,33 +64,38 @@ function inicializarComponentesBootstrap() {
   if(document.getElementById('modalProductoDetalle')) modalDetalleInst = new bootstrap.Modal(document.getElementById('modalProductoDetalle'));
 }
 
-// ================= VISITAS (HOY) =================
-async function iniciarContadorVisitasHoy() {
-    const el = document.getElementById('contador-visitas');
-    if (!el) return;
+// ================= LÓGICA DE VISITAS =================
+async function registrarVisita() {
+    try {
+        // Insertamos visita siempre que alguien entra
+        await supabaseClient.from('visitas').insert({});
+    } catch (e) { console.error("Error registrando visita", e); }
+}
+
+async function actualizarContadorVisualAdmin() {
+    const container = document.getElementById('footerVisitasContainer');
+    const label = document.getElementById('contador-visitas');
+    
+    if(!container || !label) return;
+
+    // Mostrar el contenedor (estaba d-none)
+    container.classList.remove('d-none');
 
     try {
-        await supabaseClient.from('visitas').insert({});
-        
-        // Calcular inicio del día (00:00:00)
+        // Calcular inicio del día de HOY (00:00:00)
         const hoy = new Date();
         hoy.setHours(0, 0, 0, 0);
         const hoyISO = hoy.toISOString();
 
-        // Contar visitas desde hoy
+        // Contar visitas desde esa hora
         const { count, error } = await supabaseClient
             .from('visitas')
             .select('*', { count: 'exact', head: true })
             .gte('created_at', hoyISO);
         
-        if (!error && count !== null) {
-            el.innerText = count.toLocaleString();
-        } else {
-            el.innerText = "1";
-        }
+        label.innerText = (error || count === null) ? "0" : count.toLocaleString();
     } catch (e) {
-        console.warn("Error visitas:", e);
-        el.innerText = "+100";
+        label.innerText = "?";
     }
 }
 
@@ -109,8 +127,16 @@ function actualizarInterfaz() {
   if (usuarioActual && currentUser) {
     authBtn.classList.add('d-none');
     document.getElementById('userNameNav').innerText = currentUser.nombre;
-    if (currentUser.role === 'admin') { adminBtn.classList.remove('d-none'); userDrop.classList.add('d-none'); } 
-    else { adminBtn.classList.add('d-none'); userDrop.classList.remove('d-none'); }
+    if (currentUser.role === 'admin') { 
+        adminBtn.classList.remove('d-none'); 
+        userDrop.classList.add('d-none'); 
+        // Asegurar que se ve el contador si refrescó sesión
+        actualizarContadorVisualAdmin();
+    } 
+    else { 
+        adminBtn.classList.add('d-none'); 
+        userDrop.classList.remove('d-none'); 
+    }
   } else {
     authBtn.classList.remove('d-none'); adminBtn.classList.add('d-none'); userDrop.classList.add('d-none');
   }
@@ -120,17 +146,10 @@ function actualizarInterfaz() {
 function actualizarContadorCarrito() {
   const c = getCarrito();
   const total = c.reduce((s, i) => s + i.cantidad, 0);
-  
-  const badges = document.querySelectorAll('.cartCountNav');
-  badges.forEach(b => {
+  document.querySelectorAll('.cartCountNav').forEach(b => {
       b.innerText = total;
-      if(total > 0) { 
-          b.classList.remove('d-none'); 
-          b.classList.add('animate-pulse'); 
-          setTimeout(() => b.classList.remove('animate-pulse'), 500); 
-      } else {
-          b.classList.add('d-none');
-      }
+      if(total > 0) { b.classList.remove('d-none'); b.classList.add('animate-pulse'); setTimeout(() => b.classList.remove('animate-pulse'), 500); }
+      else b.classList.add('d-none');
   });
 }
 
@@ -163,7 +182,7 @@ async function registrarUsuario() {
   const val = {};
   inputs.forEach(id => val[id] = document.getElementById(id).value.trim());
 
-  if (!val.regNombre || !val.regUser || !val.regPass) return mostrarToast('Faltan datos obligatorios.');
+  if (!val.regNombre || !val.regUser || !val.regPass) return mostrarToast('Faltan datos.');
   if (val.regPass !== val.regPassConfirm) return mostrarToast('Las contraseñas no coinciden.');
 
   const { error } = await supabaseClient.from('usuarios').insert({
@@ -188,6 +207,9 @@ async function iniciarSesion() {
 function cerrarSesion() {
   usuarioActual = null; currentUser = null; localStorage.removeItem('usuarioActual');
   actualizarInterfaz(); irASeccion('portada');
+  // Ocultar contador al salir
+  const counter = document.getElementById('footerVisitasContainer');
+  if(counter) counter.classList.add('d-none');
 }
 
 // ================= TIENDA =================
@@ -213,7 +235,9 @@ async function cargarCategorias() {
 
 async function cargarCategoriaMenu() {
   const m = document.getElementById('categoriaMenu'); if(!m) return;
-  m.innerHTML = ''; categorias.forEach(cat => m.innerHTML += `<li class="nav-item"><a class="nav-link fw-bold" href="#" onclick="verProductos('${cat.nombre}')">${cat.nombre}</a></li>`);
+  m.innerHTML = ''; 
+  // AQUÍ AGREGAMOS LA CLASE text-white fw-bold PARA QUE EL MENÚ RESALTE
+  categorias.forEach(cat => m.innerHTML += `<li class="nav-item"><a class="nav-link text-white fw-bold" href="#" onclick="verProductos('${cat.nombre}')">${cat.nombre}</a></li>`);
 }
 
 function verProductos(nom) {
@@ -528,12 +552,12 @@ function crearCardPedidoAdmin(p, turno, esPendiente, primerIdPendiente) {
     const color = esPendiente ? 'border-warning border-start border-5' : 'border-success border-start border-5 opacity-75';
     const badge = esPendiente ? `<span class="badge bg-warning text-dark">Turno #${turno}</span>` : '<span class="badge bg-success">Completado</span>';
     
-    // BOTÓN COMPLETAR SOLO SI PENDIENTE
     let btnCompletar = '';
     if(esPendiente) {
         btnCompletar = `<button class="btn btn-sm btn-success flex-grow-1" onclick="marcarPedidoCompletado(${p.id}, ${primerIdPendiente})">✅ Completar</button>`;
     }
 
+    // BOTÓN DE BORRAR MOVIDO AL FINAL
     return `
     <div class="col-md-6 col-lg-4">
         <div class="card shadow-sm mb-3 ${color}">
@@ -574,6 +598,38 @@ async function marcarPedidoCompletado(id, idDeberiaSer) {
 }
 
 // ================= CRUD ADMIN (CAT/PROD) =================
+// Función GLOBAL de búsqueda
+window.filtrarProductosAdmin = function() {
+    const query = document.getElementById('adminSearchInput').value.toLowerCase().trim();
+    const tb = document.getElementById('tablaProductosAdmin');
+    if(!tb) return;
+    
+    tb.innerHTML = '';
+    
+    // Si no hay categorías cargadas, cargar primero
+    if(categorias.length === 0) { 
+        cargarProductosAdmin(); 
+        return; 
+    }
+
+    categorias.forEach(c => {
+        c.productos.forEach(p => {
+            if(query === '' || p.nombre.toLowerCase().includes(query)) {
+                tb.innerHTML += `<tr>
+                    <td class="align-middle"><img src="${p.img}" style="width:40px;height:40px;object-fit:cover;"></td>
+                    <td class="align-middle"><div>${p.nombre}</div><small class="text-muted">${c.nombre}</small></td>
+                    <td class="align-middle">${formatearRD(p.precio)}</td>
+                    <td class="align-middle">${p.disponible?'<span class="badge bg-success">Ok</span>':'<span class="badge bg-danger">Agotado</span>'}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-light border me-1" onclick="prepProd(${c.id},${p.id})" data-bs-toggle="modal" data-bs-target="#modalProducto"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-danger" onclick="delProd(${p.id})"><i class="bi bi-trash"></i></button>
+                    </td>
+                </tr>`;
+            }
+        });
+    });
+}
+
 async function cargarCategoriasAdmin() {
   categorias = await loadCategories();
   const tb = document.getElementById('tablaCategoriasAdmin'); if(!tb) return;
@@ -583,41 +639,10 @@ async function cargarCategoriasAdmin() {
   });
 }
 
-// CARGAR Y FILTRAR PRODUCTOS
 async function cargarProductosAdmin() {
-  // Carga inicial (o recarga desde DB)
-  if(categorias.length === 0) categorias = await loadCategories();
-  renderProductosAdmin(); // Renderiza todo por defecto
-}
-
-function filtrarProductosAdmin() {
-    renderProductosAdmin(); // Vuelve a renderizar aplicando el filtro del input
-}
-
-function renderProductosAdmin() {
-  const tb = document.getElementById('tablaProductosAdmin'); 
-  const query = document.getElementById('adminSearchInput').value.toLowerCase().trim();
-  
-  if(!tb) return;
-  tb.innerHTML = '';
-
-  categorias.forEach(c => {
-      c.productos.forEach(p => {
-          // Filtro: Si hay texto, ver si coincide con nombre. Si no hay texto, pasa todo.
-          if(query === '' || p.nombre.toLowerCase().includes(query)) {
-              tb.innerHTML += `<tr>
-                  <td class="align-middle"><img src="${p.img}" style="width:40px;height:40px;object-fit:cover;"></td>
-                  <td class="align-middle"><div>${p.nombre}</div><small class="text-muted">${c.nombre}</small></td>
-                  <td class="align-middle">${formatearRD(p.precio)}</td>
-                  <td class="align-middle">${p.disponible?'<span class="badge bg-success">Ok</span>':'<span class="badge bg-danger">Agotado</span>'}</td>
-                  <td class="text-end">
-                      <button class="btn btn-sm btn-light border me-1" onclick="prepProd(${c.id},${p.id})" data-bs-toggle="modal" data-bs-target="#modalProducto"><i class="bi bi-pencil"></i></button>
-                      <button class="btn btn-sm btn-danger" onclick="delProd(${p.id})"><i class="bi bi-trash"></i></button>
-                  </td>
-              </tr>`;
-          }
-      });
-  });
+  categorias = await loadCategories();
+  // Llamamos al filtro para renderizar (muestra todo si el input está vacío)
+  filtrarProductosAdmin();
 }
 
 function prepCat(id){ document.getElementById('catId').value=id||''; if(id){const c=categorias.find(x=>x.id==id);document.getElementById('catNombre').value=c.nombre;document.getElementById('catImg').value=c.img;}else{document.getElementById('catNombre').value='';document.getElementById('catImg').value='';}}
