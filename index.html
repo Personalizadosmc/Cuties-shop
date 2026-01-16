@@ -34,12 +34,14 @@
       Mariposas Cuties
     </a>
 
-    <button class="btn btn-link nav-link position-relative order-lg-last ms-2" onclick="irASeccion('carrito')" id="btnCarrito">
-        <div class="icon-circle-bg bg-white text-primary">
-            <i class="bi bi-cart-fill fs-5"></i>
-        </div>
-        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark border border-light shadow-sm" id="cartCount">0</span>
-    </button>
+    <div class="d-none d-lg-block order-lg-last ms-2">
+        <button class="btn btn-link nav-link position-relative" onclick="irASeccion('carrito')">
+            <div class="icon-circle-bg bg-white text-primary">
+                <i class="bi bi-cart-fill fs-5"></i>
+            </div>
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark border border-light shadow-sm cartCountNav">0</span>
+        </button>
+    </div>
 
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0 text-center text-lg-start" id="categoriaMenu">
@@ -78,7 +80,6 @@
     <div class="text-center mb-5 animate-fade-in">
         <h1 class="display-5 fw-bold mb-2 text-primary">¿Qué Detalle Buscas Hoy?</h1>
         <p class="lead text-dark fw-bold mb-2">Artículos 100% Personalizados a tu gusto</p>
-        <p class="text-muted small">El precio incluye el diseño y personalizado.</p>
         
         <div class="search-container mx-auto mt-4" style="max-width: 600px;">
             <div class="input-group shadow-sm rounded-pill overflow-hidden bg-white border">
@@ -321,7 +322,7 @@
                 </p>
                 <div class="d-inline-block bg-white bg-opacity-10 px-3 py-1 rounded-pill border border-white border-opacity-25 mt-2">
                     <small>
-                        <i class="bi bi-eye-fill me-1"></i> Visitas: 
+                        <i class="bi bi-calendar-check me-1"></i> Visitas Hoy: 
                         <span id="contador-visitas" class="fw-bold">...</span>
                     </small>
                 </div>
@@ -367,6 +368,11 @@
 <a href="https://wa.me/18096659100" class="btn-whatsapp-float shadow-lg" target="_blank" title="Contáctanos por WhatsApp">
     <i class="bi bi-whatsapp"></i>
 </a>
+
+<button onclick="irASeccion('carrito')" class="btn-cart-float shadow-lg position-fixed" title="Ver Carrito">
+    <i class="bi bi-cart-fill"></i>
+    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light cartCountNav" style="font-size: 0.7rem;">0</span>
+</button>
 
 <div class="modal fade" id="modalProductoDetalle" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered modal-lg"> 
