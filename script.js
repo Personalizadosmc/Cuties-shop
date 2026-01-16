@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await cargarCategoriaMenu();
   actualizarInterfaz();
   await irASeccion('portada');
-  iniciarContadorVisitas();
+  iniciarContadorVisitasHoy(); // Nueva función solo para HOY
   
   setTimeout(() => {
       const loader = document.getElementById('loader-overlay');
@@ -51,15 +51,35 @@ function inicializarComponentesBootstrap() {
   if(document.getElementById('modalProductoDetalle')) modalDetalleInst = new bootstrap.Modal(document.getElementById('modalProductoDetalle'));
 }
 
-// ================= VISITAS =================
-async function iniciarContadorVisitas() {
-    const els = document.querySelectorAll('#contador-visitas');
-    if (els.length === 0) return;
+// ================= VISITAS (SOLO HOY) =================
+async function iniciarContadorVisitasHoy() {
+    const el = document.getElementById('contador-visitas');
+    if (!el) return;
+
     try {
+        // 1. Insertar visita nueva
         await supabaseClient.from('visitas').insert({});
-        const { count, error } = await supabaseClient.from('visitas').select('*', { count: 'exact', head: true });
-        if (!error && count !== null) els.forEach(el => el.innerText = count.toLocaleString());
-    } catch (e) { els.forEach(el => el.innerText = "1,200"); }
+        
+        // 2. Calcular inicio del día en formato ISO
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        const hoyISO = hoy.toISOString();
+
+        // 3. Contar solo las que sean mayores o iguales a hoy 00:00
+        const { count, error } = await supabaseClient
+            .from('visitas')
+            .select('*', { count: 'exact', head: true })
+            .gte('created_at', hoyISO);
+        
+        if (!error && count !== null) {
+            el.innerText = count.toLocaleString();
+        } else {
+            el.innerText = "1"; // Fallback
+        }
+    } catch (e) {
+        console.warn("Error contador visitas:", e);
+        el.innerText = "+100";
+    }
 }
 
 // ================= NAVEGACIÓN =================
@@ -101,10 +121,20 @@ function actualizarInterfaz() {
 function actualizarContadorCarrito() {
   const c = getCarrito();
   const total = c.reduce((s, i) => s + i.cantidad, 0);
-  const b = document.getElementById('cartCount');
-  b.innerText = total;
-  if(total > 0) { b.classList.remove('d-none'); b.classList.add('animate-pulse'); setTimeout(() => b.classList.remove('animate-pulse'), 500); }
-  else b.classList.add('d-none');
+  
+  // Actualizamos TODOS los elementos que tengan la clase cartCountNav (Navbar y Botón Flotante)
+  const badges = document.querySelectorAll('.cartCountNav');
+  
+  badges.forEach(b => {
+      b.innerText = total;
+      if(total > 0) { 
+          b.classList.remove('d-none'); 
+          b.classList.add('animate-pulse'); 
+          setTimeout(() => b.classList.remove('animate-pulse'), 500); 
+      } else {
+          b.classList.add('d-none');
+      }
+  });
 }
 
 function mostrarToast(msg) { document.getElementById('toastBody').innerText = msg; toastBootstrap.show(); }
@@ -123,7 +153,6 @@ async function loadCategories() {
 async function loadPedidos() {
   const { data } = await supabaseClient.from('pedidos').select('*').order('created_at', { ascending: true }); 
   return data ? data.map(p => { 
-      // Formato fecha legible
       const f = new Date(p.created_at);
       p.fechaStr = f.toLocaleDateString('es-DO');
       p.horaStr = f.toLocaleTimeString('es-DO', {hour: '2-digit', minute:'2-digit'});
@@ -321,7 +350,7 @@ async function prepararDatos() {
 
 function abrirVentanaImpresion() {
     printWindow = window.open('', '_blank');
-    if (printWindow) printWindow.document.write('<div style="text-align:center;padding:50px;font-family:sans-serif;">Generando factura...</div>');
+    if (printWindow) printWindow.document.write('<div style="text-align:center;padding:50px;font-family:sans-serif;">Generando documento...</div>');
 }
 
 async function confirmarDatosInvitado() {
@@ -345,7 +374,6 @@ async function procesarPedido(cliente) {
       return; 
   }
   
-  // Formatear fechas para uso interno
   const f = new Date(newPedido.created_at);
   newPedido.fechaStr = f.toLocaleDateString('es-DO');
   newPedido.horaStr = f.toLocaleTimeString('es-DO', {hour: '2-digit', minute:'2-digit'});
@@ -385,22 +413,16 @@ function generarLinkWhatsApp(p, turno) {
   return `https://wa.me/18096659100?text=${encodeURIComponent(msg)}`;
 }
 
-// ================= FACTURA PDF (LÓGICA FINAL) =================
+// ================= FACTURA PDF =================
 function imprimirFactura(p, turno, win) {
     if (!win) return;
     let rows = '';
     p.items.forEach(i => rows += `<tr><td style="padding:8px;border-bottom:1px solid #eee;">${i.nombre}</td><td style="text-align:center;border-bottom:1px solid #eee;">${i.cantidad}</td><td style="text-align:right;border-bottom:1px solid #eee;">${formatearRD(i.precio)}</td><td style="text-align:right;border-bottom:1px solid #eee;">${formatearRD(i.precio*i.cantidad)}</td></tr>`);
 
-    // CONDICIONAL: Solo mostrar Turno si el estado es pendiente
-    // Si p.estado no viene definido (por compatibilidad), asumimos pendiente.
-    let bloqueTurno = '';
-    if (p.estado === 'pendiente' || !p.estado) {
-        bloqueTurno = `<div><strong>ORDEN #${p.id}</strong><br>TURNO ACTUAL: <span style="font-size:18px;font-weight:bold;">#${turno || '?'}</span></div>`;
-    } else {
-        bloqueTurno = `<div><strong>ORDEN #${p.id}</strong><br>ESTADO: ENTREGADO</div>`;
-    }
+    let bloqueTurno = (p.estado === 'pendiente' || !p.estado) 
+        ? `<div><strong>ORDEN #${p.id}</strong><br>TURNO ACTUAL: <span style="font-size:18px;font-weight:bold;">#${turno || '?'}</span></div>`
+        : `<div><strong>ORDEN #${p.id}</strong><br>ESTADO: ENTREGADO</div>`;
 
-    // Fecha actual para el pie de página
     const fechaImpresion = new Date().toLocaleString('es-DO');
 
     win.document.open();
@@ -428,33 +450,18 @@ function imprimirFactura(p, turno, win) {
           <button onclick="window.print()" class="btn btn-print">🖨️ Imprimir</button>
           <button onclick="window.close()" class="btn btn-close">❌ Cerrar</button>
       </div>
-      
       <div class="header">
           <img src="Logo.PNG" class="logo" alt="Logo">
           <h1 class="title">Mariposas Cuties</h1>
           <p class="desc">Somos una empresa encargada de vender productos totalmente personalizados.</p>
       </div>
-
       <div class="meta">
-          <div>
-              <strong>CLIENTE:</strong><br>
-              ${p.cliente.nombre} ${p.cliente.apellido}<br>
-              ${p.cliente.telefono}
-          </div>
-          <div style="text-align:right;">
-              ${bloqueTurno}
-              <br><small>Fecha Pedido: ${p.fechaStr || 'Hoy'}</small>
-          </div>
+          <div><strong>CLIENTE:</strong><br>${p.cliente.nombre} ${p.cliente.apellido}<br>${p.cliente.telefono}</div>
+          <div style="text-align:right;">${bloqueTurno}<br><small>Fecha Pedido: ${p.fechaStr || 'Hoy'}</small></div>
       </div>
-
       <table><thead><tr><th>Producto</th><th style="text-align:center;">Cant.</th><th style="text-align:right;">Precio</th><th style="text-align:right;">Total</th></tr></thead><tbody>${rows}</tbody></table>
-      
       <div class="total">Total a Pagar: ${formatearRD(p.total)}</div>
-
-      <div class="footer">
-          ¡Gracias por preferirnos! ❤️
-          <div class="footer-date">Impreso el: ${fechaImpresion}</div>
-      </div>
+      <div class="footer">¡Gracias por preferirnos! ❤️<div class="footer-date">Impreso el: ${fechaImpresion}</div></div>
     </body></html>`);
     win.document.close();
 }
@@ -472,18 +479,23 @@ async function confirmarBorrarTodo() {
     }
 }
 
+// Borrar pedido individual (ya conectado al botón rojo de la tarjeta)
 async function borrarPedidoUnico(id) {
-    if(confirm('¿Eliminar este pedido?')) {
+    if(confirm('¿Eliminar este pedido permanentemente?')) {
         const { error } = await supabaseClient.from('pedidos').delete().eq('id', id);
-        if(!error) { cargarPedidosAdmin(); actualizarBadgeColaAdmin(); mostrarToast('Pedido eliminado.'); }
+        if(!error) { 
+            cargarPedidosAdmin(); 
+            actualizarBadgeColaAdmin(); 
+            mostrarToast('Pedido eliminado.'); 
+        } else {
+            mostrarToast('Error al eliminar.');
+        }
     }
 }
 
-// Buscar y mostrar factura desde Admin
 function buscarYVerDetalle(id, turno) {
     const p = historialPedidos.find(x => x.id === id);
     if(p) {
-        // Al imprimir desde admin, simulamos la ventana de impresión normal
         const win = window.open('', '_blank');
         if(win) {
             win.document.write('<div style="text-align:center;padding:50px;">Cargando factura...</div>');
@@ -499,21 +511,18 @@ async function cargarPedidosAdmin() {
   
   if(historialPedidos.length === 0) { container.innerHTML = '<div class="col-12 text-center text-muted">No hay pedidos.</div>'; return; }
 
-  // FILTRO: Pendientes (Ordenados por fecha: FIFO)
-  const pendientes = historialPedidos.filter(p => p.estado === 'pendiente'); // Ya vienen ordenados por fecha del loadPedidos
-  // FILTRO: Completados (Ordenados descendente ID)
+  // Filtros
+  const pendientes = historialPedidos.filter(p => p.estado === 'pendiente'); 
   const completados = historialPedidos.filter(p => p.estado !== 'pendiente').sort((a,b) => b.id - a.id);
 
   let turnoVisual = 1;
 
-  // Render PENDIENTES
+  // Render Pendientes
   pendientes.forEach(p => {
-      // Pasamos turnoVisual para que se pinte en la tarjeta
-      // Y también el ID del primer pendiente para la validación
       container.innerHTML += crearCardPedidoAdmin(p, turnoVisual++, true, pendientes[0].id);
   });
 
-  // Render COMPLETADOS
+  // Render Completados
   if(completados.length > 0) {
       container.innerHTML += '<div class="col-12 mt-4 mb-2"><h6 class="border-bottom pb-2 text-muted">Historial Completados</h6></div>';
       completados.forEach(p => {
@@ -526,8 +535,6 @@ function crearCardPedidoAdmin(p, turno, esPendiente, primerIdPendiente) {
     const color = esPendiente ? 'border-warning border-start border-5' : 'border-success border-start border-5 opacity-75';
     const badge = esPendiente ? `<span class="badge bg-warning text-dark">Turno #${turno}</span>` : '<span class="badge bg-success">Completado</span>';
     
-    // BOTÓN COMPLETAR: Llama a la función con validación
-    // Si es pendiente, le pasamos el ID de este pedido y el ID del PRIMERO en la cola para validar
     let btnAccion = '';
     if(esPendiente) {
         btnAccion = `<button class="btn btn-sm btn-success w-100 mt-2" onclick="marcarPedidoCompletado(${p.id}, ${primerIdPendiente})">✅ Completar Pedido</button>`;
@@ -537,7 +544,7 @@ function crearCardPedidoAdmin(p, turno, esPendiente, primerIdPendiente) {
     <div class="col-md-6 col-lg-4">
         <div class="card shadow-sm mb-3 ${color}">
             <div class="card-body position-relative">
-                <button class="btn btn-sm text-danger position-absolute top-0 end-0 m-2" title="Borrar" onclick="borrarPedidoUnico(${p.id})"><i class="bi bi-x-lg"></i></button>
+                <button class="btn btn-sm text-danger position-absolute top-0 end-0 m-2" title="Eliminar este pedido" onclick="borrarPedidoUnico(${p.id})"><i class="bi bi-trash3-fill"></i></button>
                 <div class="d-flex justify-content-between mb-2 align-items-center">
                     <span class="fw-bold text-muted small">ID: ${p.id}</span>
                     ${badge}
@@ -558,19 +565,18 @@ function crearCardPedidoAdmin(p, turno, esPendiente, primerIdPendiente) {
 
 // LÓGICA DE ORDEN ESTRICTO
 async function marcarPedidoCompletado(id, idDeberiaSer) {
-    // Si el ID que intento completar NO es el mismo que el "Primer ID Pendiente"
     if (id !== idDeberiaSer) {
         alert(`🚫 ¡ALTO!\n\nDebes completar los pedidos en orden de llegada.\nEl pedido que toca despachar es el ID #${idDeberiaSer}.`);
         return;
     }
 
-    if(confirm('¿Pedido entregado? Pasará al historial y el siguiente tomará el Turno #1.')) {
+    if(confirm('¿Pedido entregado? Pasará al historial.')) {
         await supabaseClient.from('pedidos').update({estado: 'completado'}).eq('id', id);
         cargarPedidosAdmin(); actualizarBadgeColaAdmin(); mostrarToast("Pedido completado.");
     }
 }
 
-// ================= CRUD ADMIN (CATEGORIAS/PRODUCTOS) =================
+// ================= CRUD ADMIN =================
 async function cargarCategoriasAdmin() {
   categorias = await loadCategories();
   const tb = document.getElementById('tablaCategoriasAdmin'); if(!tb) return;
@@ -588,7 +594,6 @@ async function cargarProductosAdmin() {
   }));
 }
 
-// Helpers cortos para CRUD
 function prepCat(id){ document.getElementById('catId').value=id||''; if(id){const c=categorias.find(x=>x.id==id);document.getElementById('catNombre').value=c.nombre;document.getElementById('catImg').value=c.img;}else{document.getElementById('catNombre').value='';document.getElementById('catImg').value='';}}
 async function guardarCategoria(){ const id=document.getElementById('catId').value,n=document.getElementById('catNombre').value,i=document.getElementById('catImg').value; if(!n)return; const {error}=id?await supabaseClient.from('categorias').update({nombre:n,img:i}).eq('id',id):await supabaseClient.from('categorias').insert({nombre:n,img:i}); if(!error){modalCategoriaInst.hide();cargarCategoriasAdmin();} }
 async function delCat(id){ if(confirm("¿Borrar?")) {await supabaseClient.from('categorias').delete().eq('id',id);cargarCategoriasAdmin();} }
