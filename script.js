@@ -24,7 +24,7 @@ function formatearRD(monto) {
 document.addEventListener('DOMContentLoaded', async () => {
   inicializarComponentesBootstrap();
   
-  // 1. Registrar Visita (Invisible para el usuario, pero cuenta)
+  // 1. Registrar Visita (Invisible para el usuario, pero cuenta en base de datos)
   await registrarVisita();
 
   // 2. Verificar Sesión
@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   
   // 3. Cargar Interfaz
-  await cargarCategoriaMenu(); // Ahora con texto blanco intenso
+  await cargarCategoriaMenu(); 
   actualizarInterfaz();
   await irASeccion('portada');
   
@@ -67,7 +67,6 @@ function inicializarComponentesBootstrap() {
 // ================= LÓGICA DE VISITAS =================
 async function registrarVisita() {
     try {
-        // Insertamos visita siempre que alguien entra
         await supabaseClient.from('visitas').insert({});
     } catch (e) { console.error("Error registrando visita", e); }
 }
@@ -78,16 +77,14 @@ async function actualizarContadorVisualAdmin() {
     
     if(!container || !label) return;
 
-    // Mostrar el contenedor (estaba d-none)
+    // Mostrar el contenedor (estaba d-none) solo para el admin
     container.classList.remove('d-none');
 
     try {
-        // Calcular inicio del día de HOY (00:00:00)
         const hoy = new Date();
         hoy.setHours(0, 0, 0, 0);
         const hoyISO = hoy.toISOString();
 
-        // Contar visitas desde esa hora
         const { count, error } = await supabaseClient
             .from('visitas')
             .select('*', { count: 'exact', head: true })
@@ -105,7 +102,12 @@ async function irASeccion(seccion) {
   const activeSection = document.getElementById(seccion);
   if(activeSection) activeSection.classList.add('active');
 
-  if (seccion === 'portada') { await cargarCategorias(); limpiarBusqueda(); }
+  if (seccion === 'portada') { 
+      await cargarCategorias(); 
+      limpiarBusqueda();
+      // Limpiar selección de menú si volvemos a portada
+      document.querySelectorAll('.nav-link').forEach(btn => btn.classList.remove('active-cat'));
+  }
   else if (seccion === 'carrito') { cargarCarrito(); } 
   else if (seccion === 'adminPanel') {
     if (currentUser?.role !== 'admin') { mostrarToast('🚫 Acceso denegado.'); irASeccion('portada'); return; }
@@ -130,7 +132,6 @@ function actualizarInterfaz() {
     if (currentUser.role === 'admin') { 
         adminBtn.classList.remove('d-none'); 
         userDrop.classList.add('d-none'); 
-        // Asegurar que se ve el contador si refrescó sesión
         actualizarContadorVisualAdmin();
     } 
     else { 
@@ -207,7 +208,6 @@ async function iniciarSesion() {
 function cerrarSesion() {
   usuarioActual = null; currentUser = null; localStorage.removeItem('usuarioActual');
   actualizarInterfaz(); irASeccion('portada');
-  // Ocultar contador al salir
   const counter = document.getElementById('footerVisitasContainer');
   if(counter) counter.classList.add('d-none');
 }
@@ -236,9 +236,10 @@ async function cargarCategorias() {
 async function cargarCategoriaMenu() {
   const m = document.getElementById('categoriaMenu'); if(!m) return;
   m.innerHTML = ''; 
-  // Creamos los botones con un ID único para poder pintarlos luego
+  // Generamos botones con ID único para poder resaltarlos
   categorias.forEach(cat => {
-      m.innerHTML += `<li class="nav-item">
+      m.innerHTML += `
+      <li class="nav-item">
         <a class="nav-link text-white fw-bold" id="menu-btn-${cat.id}" href="#" onclick="verProductos('${cat.nombre}')">${cat.nombre}</a>
       </li>`;
   });
@@ -249,10 +250,8 @@ function verProductos(nom) {
   if (cat) {
       mostrarProductosEnSeccion(cat.nombre, cat.productos);
       
-      // LOGICA NUEVA: Resaltar botón activo
-      // 1. Quitar clase active-cat de todos
+      // LOGICA PARA RESALTAR EL BOTÓN ACTIVO
       document.querySelectorAll('.nav-link').forEach(btn => btn.classList.remove('active-cat'));
-      // 2. Agregar clase al seleccionado
       const btnActivo = document.getElementById(`menu-btn-${cat.id}`);
       if(btnActivo) btnActivo.classList.add('active-cat');
   }
@@ -447,7 +446,7 @@ function generarLinkWhatsApp(p, turno) {
   return `https://wa.me/18096659100?text=${encodeURIComponent(msg)}`;
 }
 
-// ================= FACTURA PDF =================
+// ================= FACTURA PDF (LIMPIA) =================
 function imprimirFactura(p, turno, win) {
     if (!win) return;
     let rows = '';
@@ -457,7 +456,7 @@ function imprimirFactura(p, turno, win) {
         ? `<div><strong>ORDEN #${p.id}</strong><br>TURNO ACTUAL: <span style="font-size:18px;font-weight:bold;">#${turno || '?'}</span></div>`
         : `<div><strong>ORDEN #${p.id}</strong><br>ESTADO: ENTREGADO</div>`;
 
-    // ELIMINÉ LA FECHA DEL PIE DE PÁGINA COMO PEDISTE
+    // SIN FECHA DE IMPRESIÓN AL FINAL
     win.document.open();
     win.document.write(`
     <html><head><title>Cotización #${p.id}</title>
@@ -568,7 +567,7 @@ function crearCardPedidoAdmin(p, turno, esPendiente, primerIdPendiente) {
         btnCompletar = `<button class="btn btn-sm btn-success flex-grow-1" onclick="marcarPedidoCompletado(${p.id}, ${primerIdPendiente})">✅ Completar</button>`;
     }
 
-    // BOTÓN DE BORRAR MOVIDO AL FINAL
+    // BOTÓN DE BORRAR AL FINAL
     return `
     <div class="col-md-6 col-lg-4">
         <div class="card shadow-sm mb-3 ${color}">
@@ -609,19 +608,14 @@ async function marcarPedidoCompletado(id, idDeberiaSer) {
 }
 
 // ================= CRUD ADMIN (CAT/PROD) =================
-// Función GLOBAL de búsqueda
+// Función GLOBAL de búsqueda admin
 window.filtrarProductosAdmin = function() {
     const query = document.getElementById('adminSearchInput').value.toLowerCase().trim();
     const tb = document.getElementById('tablaProductosAdmin');
     if(!tb) return;
     
     tb.innerHTML = '';
-    
-    // Si no hay categorías cargadas, cargar primero
-    if(categorias.length === 0) { 
-        cargarProductosAdmin(); 
-        return; 
-    }
+    if(categorias.length === 0) { cargarProductosAdmin(); return; }
 
     categorias.forEach(c => {
         c.productos.forEach(p => {
@@ -652,7 +646,6 @@ async function cargarCategoriasAdmin() {
 
 async function cargarProductosAdmin() {
   categorias = await loadCategories();
-  // Llamamos al filtro para renderizar (muestra todo si el input está vacío)
   filtrarProductosAdmin();
 }
 
