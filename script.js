@@ -547,9 +547,9 @@ function imprimirFactura(p, turno, win) {
                 <div>
                     <h2 style="color:#6a1b9a; margin:0;">Mariposas Cuties</h2>
                     <small>Creando Para ti..<br>
-                    RNC: 05500440051<br>
+                    <strong>RNC: 05500440051</strong><br>
                     C/Salcedo-Tenares, Entrada Los Platanitos, República Dominicana<br>
-                     EN PERSONALIZADOS SOMOS TU MEJOR OPCIÓN
+                     <strong>EN PERSONALIZADOS SOMOS TU MEJOR OPCIÓN</strong>
                     </small>
                 </div>
             </div>
@@ -603,8 +603,8 @@ function imprimirFactura(p, turno, win) {
         </div>
 
         <div class="footer">
-            <p><strong>¡Gracias por tu preferencia! ❤️</strong></p>
-            <p>Contactos: (809) 665-9100 | (809)-227-3753 | Instagram: @mariposas_cuties.rd</p>
+            <h5><strong>¡Gracias por tu preferencia! ❤️</strong></h5>
+            <p><strong>Contactos:</strong> (809) 665-9100 | (829)-827-3753 | Instagram: @mariposas_cuties.rd</p>
         </div>
 
         <script>
@@ -779,3 +779,4 @@ async function delCat(id){ if(confirm("¿Borrar?")) {await supabaseClient.from('
 function prepProd(cid,pid){ const s=document.getElementById('prodCatId');s.innerHTML='';categorias.forEach(c=>s.innerHTML+=`<option value="${c.id}">${c.nombre}</option>`); document.getElementById('prodId').value=pid||''; if(pid){const p=categorias.find(c=>c.id==cid).productos.find(x=>x.id==pid);s.value=cid;document.getElementById('prodNombre').value=p.nombre;document.getElementById('prodPrecio').value=p.precio;document.getElementById('prodImg').value=p.img;document.getElementById('prodDesc').value=p.descripcion||'';document.getElementById('prodDisponible').checked=p.disponible;}else{document.getElementById('prodNombre').value='';document.getElementById('prodPrecio').value='';document.getElementById('prodImg').value='';document.getElementById('prodDesc').value='';}}
 async function guardarProducto(){ const id=document.getElementById('prodId').value,cid=document.getElementById('prodCatId').value,n=document.getElementById('prodNombre').value,p=document.getElementById('prodPrecio').value,i=document.getElementById('prodImg').value,d=document.getElementById('prodDesc').value,disp=document.getElementById('prodDisponible').checked; if(!n)return; const pay={category_id:cid,nombre:n,precio:p,img:i,descripcion:d,disponible:disp}; const {error}=id?await supabaseClient.from('productos').update(pay).eq('id',id):await supabaseClient.from('productos').insert(pay); if(!error){modalProductoInst.hide();cargarProductosAdmin();} }
 async function delProd(id){ if(confirm("¿Borrar?")) {await supabaseClient.from('productos').delete().eq('id',id);cargarProductosAdmin();} }
+
