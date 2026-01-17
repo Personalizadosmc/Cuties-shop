@@ -24,15 +24,18 @@ function formatearRD(monto) {
 document.addEventListener('DOMContentLoaded', async () => {
   inicializarComponentesBootstrap();
   
-  // 1. Registrar Visita (Invisible para el usuario, pero cuenta en base de datos)
+  // 1. Registrar Visita
   await registrarVisita();
 
-  // 2. Verificar Sesión
+  // 2. Cargar Contenido Web (Banners y Clientes) - NUEVO
+  await cargarContenidoWeb();
+
+  // 3. Verificar Sesión
   if (usuarioActual) {
     const { data } = await supabaseClient.from('usuarios').select('*').eq('username', usuarioActual).single();
     if (data) {
       currentUser = data;
-      // Solo si es ADMIN, cargamos y mostramos el contador
+      // Solo si es ADMIN, cargamos y mostramos el contador y contenido
       if(currentUser.role === 'admin') {
           actualizarContadorVisualAdmin();
       }
@@ -42,12 +45,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
   
-  // 3. Cargar Interfaz
+  // 4. Cargar Interfaz
   await cargarCategoriaMenu(); 
   actualizarInterfaz();
   await irASeccion('portada');
   
-  // 4. Quitar Loader
+  // 5. Quitar Loader
   setTimeout(() => {
       const loader = document.getElementById('loader-overlay');
       if(loader) { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 500); }
@@ -77,8 +80,7 @@ async function actualizarContadorVisualAdmin() {
     
     if(!container || !label) return;
 
-    // Mostrar el contenedor (estaba d-none) solo para el admin
-    container.classList.remove('d-none');
+    container.classList.remove('d-none'); // Mostrar solo si admin
 
     try {
         const hoy = new Date();
@@ -96,6 +98,168 @@ async function actualizarContadorVisualAdmin() {
     }
 }
 
+// ================= GESTIÓN DE CONTENIDO WEB (BANNERS Y CLIENTES) - NUEVO =================
+
+// 1. Mostrar Banners y Galería en la Portada
+async function cargarContenidoWeb() {
+    // Si no existe el elemento carrusel en el HTML, no hacemos nada
+    if (!document.getElementById('carouselPromos')) return;
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('contenido_web')
+            .select('*')
+            .eq('activo', true)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const banners = data.filter(item => item.tipo === 'banner');
+        const clientes = data.filter(item => item.tipo === 'cliente');
+
+        // A. Renderizar Banners Carrusel
+        const carouselContainer = document.getElementById('carouselPromos');
+        const carouselInner = document.querySelector('#carouselPromos .carousel-inner');
+        const carouselIndicators = document.querySelector('#carouselPromos .carousel-indicators');
+        
+        if (banners.length > 0) {
+            carouselContainer.style.display = 'block'; // Mostrar carrusel
+            carouselInner.innerHTML = '';
+            carouselIndicators.innerHTML = '';
+
+            banners.forEach((banner, index) => {
+                // Indicadores (puntos)
+                carouselIndicators.innerHTML += `
+                    <button type="button" data-bs-target="#carouselPromos" data-bs-slide-to="${index}" 
+                        class="${index === 0 ? 'active' : ''}"></button>`;
+
+                // Slides
+                carouselInner.innerHTML += `
+                    <div class="carousel-item ${index === 0 ? 'active' : ''}">
+                        <img src="${banner.imagen_url}" class="d-block w-100 banner-img" alt="${banner.titulo || 'Promo'}">
+                        ${banner.titulo ? `
+                        <div class="carousel-caption d-none d-md-block">
+                            <h5>${banner.titulo}</h5>
+                        </div>` : ''}
+                    </div>`;
+            });
+        } else {
+            carouselContainer.style.display = 'none'; // Ocultar si no hay banners
+        }
+
+        // B. Renderizar Galería Clientes
+        const galeriaClientes = document.getElementById('galeriaClientesRow');
+        if (galeriaClientes && clientes.length > 0) {
+            galeriaClientes.innerHTML = '';
+            clientes.forEach(cliente => {
+                galeriaClientes.innerHTML += `
+                    <div class="col-3 col-md-2">
+                        <img src="${cliente.imagen_url}" class="img-fluid rounded shadow-sm cliente-foto" alt="Cliente Feliz" onclick="window.open('${cliente.imagen_url}')">
+                    </div>`;
+            });
+        }
+
+    } catch (error) {
+        console.error("Error cargando contenido web:", error);
+    }
+}
+
+// 2. Subir Imagen (Función Admin)
+async function subirContenidoWeb() {
+    const fileInput = document.getElementById('fileContenido');
+    const tipo = document.getElementById('tipoContenido').value;
+    const titulo = document.getElementById('tituloContenido').value;
+    const file = fileInput.files[0];
+
+    if (!file) return alert("Por favor selecciona una imagen");
+
+    try {
+        // Mostrar algún indicador de carga si lo deseas, o simplemente bloquear el botón
+        const btnSubir = document.querySelector('button[onclick="subirContenidoWeb()"]');
+        if(btnSubir) btnSubir.disabled = true; btnSubir.innerText = "Subiendo...";
+
+        // A. Subir al Storage (Bucket: contenido-web)
+        // Usamos Date.now() para nombre único y evitar duplicados
+        const nombreArchivo = `${Date.now()}_${file.name.replace(/\s/g, '')}`;
+        
+        const { data: dataStorage, error: errorStorage } = await supabaseClient
+            .storage
+            .from('contenido-web')
+            .upload(nombreArchivo, file);
+
+        if (errorStorage) throw errorStorage;
+
+        // B. Obtener URL Pública
+        const { data: dataUrl } = supabaseClient
+            .storage
+            .from('contenido-web')
+            .getPublicUrl(nombreArchivo);
+
+        const publicUrl = dataUrl.publicUrl;
+
+        // C. Guardar referencia en Base de Datos
+        const { error: errorDB } = await supabaseClient
+            .from('contenido_web')
+            .insert([{ tipo: tipo, imagen_url: publicUrl, titulo: titulo }]);
+
+        if (errorDB) throw errorDB;
+
+        mostrarToast("¡Imagen subida correctamente!");
+        fileInput.value = '';
+        document.getElementById('tituloContenido').value = '';
+        
+        // Refrescar lista admin y portada
+        await cargarContenidoAdmin();
+        await cargarContenidoWeb();
+
+    } catch (error) {
+        console.error("Error subiendo:", error);
+        alert("Error al subir: " + error.message);
+    } finally {
+        const btnSubir = document.querySelector('button[onclick="subirContenidoWeb()"]');
+        if(btnSubir) btnSubir.disabled = false; btnSubir.innerHTML = '<i class="bi bi-cloud-upload"></i> Subir Imagen';
+    }
+}
+
+// 3. Cargar lista para borrar (Función Admin)
+async function cargarContenidoAdmin() {
+    const lista = document.getElementById('listaContenidoAdmin');
+    if (!lista) return;
+
+    const { data } = await supabaseClient.from('contenido_web').select('*').eq('activo', true).order('created_at', { ascending: false });
+    
+    lista.innerHTML = '';
+    if(data.length === 0) lista.innerHTML = '<p class="text-muted small">No hay imágenes activas.</p>';
+
+    data.forEach(item => {
+        lista.innerHTML += `
+            <div class="col-4 col-md-2 position-relative">
+                <div class="border rounded p-1">
+                    <img src="${item.imagen_url}" class="img-fluid rounded" style="height:80px; width:100%; object-fit:cover;">
+                    <button onclick="eliminarContenido(${item.id})" class="btn btn-danger btn-sm position-absolute top-0 end-0 p-0 shadow" style="width:24px; height:24px; line-height:1; border-radius:50%; margin: -5px -5px 0 0;">&times;</button>
+                    <small class="d-block text-center mt-1 text-truncate" style="font-size:10px;">${item.tipo.toUpperCase()}</small>
+                </div>
+            </div>
+        `;
+    });
+}
+
+// 4. Eliminar Imagen
+async function eliminarContenido(id) {
+    if(!confirm("¿Seguro que quieres borrar esta imagen?")) return;
+    
+    // Borramos de la tabla (no borramos del storage para evitar errores si la imagen se usa en otro lado, pero podrías hacerlo)
+    const { error } = await supabaseClient.from('contenido_web').delete().eq('id', id);
+    
+    if(!error) {
+        mostrarToast("Imagen eliminada.");
+        cargarContenidoAdmin();
+        cargarContenidoWeb();
+    } else {
+        mostrarToast("Error al eliminar.");
+    }
+}
+
 // ================= NAVEGACIÓN =================
 async function irASeccion(seccion) {
   document.querySelectorAll('.seccion').forEach(s => s.classList.remove('active'));
@@ -104,8 +268,8 @@ async function irASeccion(seccion) {
 
   if (seccion === 'portada') { 
       await cargarCategorias(); 
+      await cargarContenidoWeb(); // Asegurar que los banners se vean al volver
       limpiarBusqueda();
-      // Limpiar selección de menú si volvemos a portada
       document.querySelectorAll('.nav-link').forEach(btn => btn.classList.remove('active-cat'));
   }
   else if (seccion === 'carrito') { cargarCarrito(); } 
@@ -113,68 +277,13 @@ async function irASeccion(seccion) {
     if (currentUser?.role !== 'admin') { mostrarToast('🚫 Acceso denegado.'); irASeccion('portada'); return; }
     await cargarCategoriasAdmin();
     await cargarPedidosAdmin();
+    await cargarContenidoAdmin(); // Cargar gestión de fotos
     await actualizarBadgeColaAdmin();
   }
   
   window.scrollTo({top: 0, behavior: 'smooth'});
   const navBar = document.getElementById('navbarNav');
   if (navBar && navBar.classList.contains('show')) bootstrap.Collapse.getInstance(navBar).hide();
-}
-
-function actualizarInterfaz() {
-  const authBtn = document.getElementById('authButtonsContainer');
-  const adminBtn = document.getElementById('btnAdminNav');
-  const userDrop = document.getElementById('userDropdownContainer');
-  
-  if (usuarioActual && currentUser) {
-    authBtn.classList.add('d-none');
-    document.getElementById('userNameNav').innerText = currentUser.nombre;
-    if (currentUser.role === 'admin') { 
-        adminBtn.classList.remove('d-none'); 
-        userDrop.classList.add('d-none'); 
-        actualizarContadorVisualAdmin();
-    } 
-    else { 
-        adminBtn.classList.add('d-none'); 
-        userDrop.classList.remove('d-none'); 
-    }
-  } else {
-    authBtn.classList.remove('d-none'); adminBtn.classList.add('d-none'); userDrop.classList.add('d-none');
-  }
-  actualizarContadorCarrito();
-}
-
-function actualizarContadorCarrito() {
-  const c = getCarrito();
-  const total = c.reduce((s, i) => s + i.cantidad, 0);
-  document.querySelectorAll('.cartCountNav').forEach(b => {
-      b.innerText = total;
-      if(total > 0) { b.classList.remove('d-none'); b.classList.add('animate-pulse'); setTimeout(() => b.classList.remove('animate-pulse'), 500); }
-      else b.classList.add('d-none');
-  });
-}
-
-function mostrarToast(msg) { document.getElementById('toastBody').innerText = msg; toastBootstrap.show(); }
-
-// ================= DATOS =================
-async function loadCategories() {
-  const { data: cats, error } = await supabaseClient.from('categorias').select('*');
-  if (error) return [];
-  for (let cat of cats) {
-    const { data: prods } = await supabaseClient.from('productos').select('*').eq('category_id', cat.id);
-    cat.productos = prods || [];
-  }
-  return cats;
-}
-
-async function loadPedidos() {
-  const { data } = await supabaseClient.from('pedidos').select('*').order('created_at', { ascending: true }); 
-  return data ? data.map(p => { 
-      const f = new Date(p.created_at);
-      p.fechaStr = f.toLocaleDateString('es-DO');
-      p.horaStr = f.toLocaleTimeString('es-DO', {hour: '2-digit', minute:'2-digit'});
-      return p; 
-  }) : [];
 }
 
 // ================= AUTH =================
@@ -208,11 +317,9 @@ async function iniciarSesion() {
 function cerrarSesion() {
   usuarioActual = null; currentUser = null; localStorage.removeItem('usuarioActual');
   actualizarInterfaz(); irASeccion('portada');
-  const counter = document.getElementById('footerVisitasContainer');
-  if(counter) counter.classList.add('d-none');
 }
 
-// ================= TIENDA =================
+// ================= TIENDA (CATEGORÍAS Y PRODUCTOS) =================
 async function cargarCategorias() {
   categorias = await loadCategories();
   const c = document.getElementById('listaCategorias'); c.innerHTML = '';
@@ -236,7 +343,6 @@ async function cargarCategorias() {
 async function cargarCategoriaMenu() {
   const m = document.getElementById('categoriaMenu'); if(!m) return;
   m.innerHTML = ''; 
-  // Generamos botones con ID único para poder resaltarlos
   categorias.forEach(cat => {
       m.innerHTML += `
       <li class="nav-item">
@@ -249,8 +355,6 @@ function verProductos(nom) {
   const cat = categorias.find(c => c.nombre === nom);
   if (cat) {
       mostrarProductosEnSeccion(cat.nombre, cat.productos);
-      
-      // LOGICA PARA RESALTAR EL BOTÓN ACTIVO
       document.querySelectorAll('.nav-link').forEach(btn => btn.classList.remove('active-cat'));
       const btnActivo = document.getElementById(`menu-btn-${cat.id}`);
       if(btnActivo) btnActivo.classList.add('active-cat');
@@ -311,10 +415,20 @@ function buscarProductos() {
   const cc = document.getElementById('contenedorCategorias');
   const cr = document.getElementById('contenedorResultados');
   const lr = document.getElementById('listaResultados');
+  const banners = document.getElementById('carouselPromos'); // Ocultar banner al buscar
 
-  if (q === '') { cc.classList.remove('d-none'); cr.classList.add('d-none'); return; }
+  if (q === '') { 
+      cc.classList.remove('d-none'); 
+      cr.classList.add('d-none'); 
+      if(banners) banners.style.display = 'block';
+      return; 
+  }
 
-  cc.classList.add('d-none'); cr.classList.remove('d-none'); lr.innerHTML = '';
+  cc.classList.add('d-none'); 
+  cr.classList.remove('d-none'); 
+  if(banners) banners.style.display = 'none';
+  
+  lr.innerHTML = '';
   let res = [];
   categorias.forEach(c => c.productos.forEach(p => { if (p.nombre.toLowerCase().includes(q)) res.push({p, catId: c.id}); }));
 
@@ -450,7 +564,6 @@ function generarLinkWhatsApp(p, turno) {
 function imprimirFactura(p, turno, win) {
     if (!win) return;
 
-    // 1. Generar filas de la tabla con IMAGEN
     let rows = '';
     p.items.forEach(i => {
         rows += `
@@ -468,7 +581,6 @@ function imprimirFactura(p, turno, win) {
         </tr>`;
     });
 
-    // 2. Definir estado y turno
     let bloqueEstado = (p.estado === 'pendiente' || !p.estado) 
         ? `<div class="status-box pending">
              <span style="font-size:12px; text-transform:uppercase; letter-spacing:1px;">Turno de Entrega</span><br>
@@ -478,7 +590,6 @@ function imprimirFactura(p, turno, win) {
              <span style="font-size:16px; font-weight:bold; color:#2e7d32;">ENTREGADO</span>
            </div>`;
 
-    // 3. Escribir el HTML Profesional
     win.document.open();
     win.document.write(`
     <!DOCTYPE html>
@@ -487,60 +598,41 @@ function imprimirFactura(p, turno, win) {
         <title>Cotización #${p.id} - Mariposas Cuties</title>
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
-            
             body { font-family: 'Roboto', sans-serif; color: #333; margin: 0; padding: 40px; font-size: 14px; background: white; }
-            
-            /* Encabezado */
             .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #6a1b9a; padding-bottom: 20px; margin-bottom: 30px; }
             .logo-area { display: flex; align-items: center; gap: 15px; }
             .logo-area img { height: 70px; width: auto; }
             .company-info { font-size: 12px; color: #555; text-align: right; }
             .company-info h2 { margin: 0; color: #6a1b9a; font-size: 22px; text-transform: uppercase; }
-            
-            /* Info Cliente y Pedido */
             .info-grid { display: flex; justify-content: space-between; margin-bottom: 40px; background: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px solid #eee; }
             .client-info h3, .order-info h3 { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-top: 0; margin-bottom: 10px; }
             .data { font-size: 15px; font-weight: 600; color: #000; line-height: 1.4; }
-            
-            /* Caja de Estado/Turno */
             .status-box { text-align: center; border: 2px dashed #ccc; padding: 10px 20px; border-radius: 8px; background: #fff; min-width: 120px; }
-            
-            /* Tabla */
             table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
             th { background-color: #6a1b9a; color: white; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; padding: 12px; text-align: left; }
             td { padding: 12px; border-bottom: 1px solid #eee; }
             .item-row:nth-child(even) { background-color: #fbfbfb; }
-            
-            /* Totales */
             .total-section { display: flex; justify-content: flex-end; }
             .total-box { width: 250px; }
             .total-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
             .total-row.final { border-top: 2px solid #6a1b9a; border-bottom: none; font-size: 18px; font-weight: bold; color: #6a1b9a; margin-top: 10px; padding-top: 10px; }
-            
-            /* Footer */
             .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #777; border-top: 1px solid #ddd; padding-top: 20px; }
-            
-            /* Botones (No salen en impresión) */
             .no-print { text-align: center; margin-bottom: 20px; padding: 10px; background: #f0f0f0; border-radius: 8px; }
             .btn { background: #6a1b9a; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin: 0 5px; }
             .btn-close { background: #555; }
-            
             @media print {
                 .no-print { display: none; }
                 body { padding: 0; }
-                /* Forza la impresión de colores de fondo (importante para la barra morada) */
                 -webkit-print-color-adjust: exact; 
                 print-color-adjust: exact;
             }
         </style>
     </head>
     <body>
-    
         <div class="no-print">
             <button onclick="window.print()" class="btn">🖨️ Imprimir / Guardar PDF</button>
             <button onclick="window.close()" class="btn btn-close">Cerrar</button>
         </div>
-
         <div class="header">
             <div class="logo-area">
                 <img src="Logo.PNG" alt="Logo">
@@ -549,8 +641,7 @@ function imprimirFactura(p, turno, win) {
                     <small>Creando Para ti..<br>
                     RNC: 05500440051<br>
                     C/Salcedo-Tenares, Entrada Los Platanitos, República Dominicana<br>
-                     EN PERSONALIZADOS SOMOS TU MEJOR OPCIÓN
-                    </small>
+                    EN PERSONALIZADOS SOMOS TU MEJOR OPCIÓN</small>
                 </div>
             </div>
             <div class="company-info">
@@ -560,7 +651,6 @@ function imprimirFactura(p, turno, win) {
                 ID Orden: <strong>#${p.id}</strong></p>
             </div>
         </div>
-
         <div class="info-grid">
             <div class="client-info">
                 <h3>Facturado a:</h3>
@@ -569,7 +659,6 @@ function imprimirFactura(p, turno, win) {
             </div>
             ${bloqueEstado}
         </div>
-
         <table>
             <thead>
                 <tr>
@@ -580,11 +669,8 @@ function imprimirFactura(p, turno, win) {
                     <th style="text-align:right; width: 110px;">Total</th>
                 </tr>
             </thead>
-            <tbody>
-                ${rows}
-            </tbody>
+            <tbody>${rows}</tbody>
         </table>
-
         <div class="total-section">
             <div class="total-box">
                 <div class="total-row">
@@ -601,20 +687,11 @@ function imprimirFactura(p, turno, win) {
                 </div>
             </div>
         </div>
-
         <div class="footer">
             <p><strong>¡Gracias por tu preferencia! ❤️</strong></p>
             <p>Contactos: (809) 665-9100 | (809)-227-3753 | Instagram: @mariposas_cuties.rd</p>
         </div>
-
-        <script>
-            // Intentar imprimir automáticamente cuando carguen las imágenes
-            window.onload = function() {
-                setTimeout(function() {
-                   // window.print(); // Descomenta si quieres que se abra solo
-                }, 500);
-            }
-        </script>
+        <script>window.onload = function() { setTimeout(function() {}, 500); }</script>
     </body>
     </html>`);
     win.document.close();
@@ -690,7 +767,6 @@ function crearCardPedidoAdmin(p, turno, esPendiente, primerIdPendiente) {
         btnCompletar = `<button class="btn btn-sm btn-success flex-grow-1" onclick="marcarPedidoCompletado(${p.id}, ${primerIdPendiente})">✅ Completar</button>`;
     }
 
-    // BOTÓN DE BORRAR AL FINAL
     return `
     <div class="col-md-6 col-lg-4">
         <div class="card shadow-sm mb-3 ${color}">
@@ -731,7 +807,6 @@ async function marcarPedidoCompletado(id, idDeberiaSer) {
 }
 
 // ================= CRUD ADMIN (CAT/PROD) =================
-// Función GLOBAL de búsqueda admin
 window.filtrarProductosAdmin = function() {
     const query = document.getElementById('adminSearchInput').value.toLowerCase().trim();
     const tb = document.getElementById('tablaProductosAdmin');
@@ -779,6 +854,3 @@ async function delCat(id){ if(confirm("¿Borrar?")) {await supabaseClient.from('
 function prepProd(cid,pid){ const s=document.getElementById('prodCatId');s.innerHTML='';categorias.forEach(c=>s.innerHTML+=`<option value="${c.id}">${c.nombre}</option>`); document.getElementById('prodId').value=pid||''; if(pid){const p=categorias.find(c=>c.id==cid).productos.find(x=>x.id==pid);s.value=cid;document.getElementById('prodNombre').value=p.nombre;document.getElementById('prodPrecio').value=p.precio;document.getElementById('prodImg').value=p.img;document.getElementById('prodDesc').value=p.descripcion||'';document.getElementById('prodDisponible').checked=p.disponible;}else{document.getElementById('prodNombre').value='';document.getElementById('prodPrecio').value='';document.getElementById('prodImg').value='';document.getElementById('prodDesc').value='';}}
 async function guardarProducto(){ const id=document.getElementById('prodId').value,cid=document.getElementById('prodCatId').value,n=document.getElementById('prodNombre').value,p=document.getElementById('prodPrecio').value,i=document.getElementById('prodImg').value,d=document.getElementById('prodDesc').value,disp=document.getElementById('prodDisponible').checked; if(!n)return; const pay={category_id:cid,nombre:n,precio:p,img:i,descripcion:d,disponible:disp}; const {error}=id?await supabaseClient.from('productos').update(pay).eq('id',id):await supabaseClient.from('productos').insert(pay); if(!error){modalProductoInst.hide();cargarProductosAdmin();} }
 async function delProd(id){ if(confirm("¿Borrar?")) {await supabaseClient.from('productos').delete().eq('id',id);cargarProductosAdmin();} }
-
-
-
