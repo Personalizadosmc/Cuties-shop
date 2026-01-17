@@ -20,45 +20,52 @@ function formatearRD(monto) {
   return 'RD$ ' + monto.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
-// ================= INICIALIZACIÓN (DOM READY) =================
+// ================= INICIALIZACIÓN (A PRUEBA DE ERRORES) =================
 document.addEventListener('DOMContentLoaded', async () => {
-  inicializarComponentesBootstrap();
-  
-  // 1. Registrar Visita
-  await registrarVisita();
-
-  // 2. Cargar Contenido Web (Banners y Clientes) - NUEVO
-  await cargarContenidoWeb();
-
-  // 3. Verificar Sesión
-  if (usuarioActual) {
-    const { data } = await supabaseClient.from('usuarios').select('*').eq('username', usuarioActual).single();
-    if (data) {
-      currentUser = data;
-      // Solo si es ADMIN, cargamos y mostramos el contador y contenido
-      if(currentUser.role === 'admin') {
-          actualizarContadorVisualAdmin();
+  try {
+      inicializarComponentesBootstrap();
+      
+      // 1. Cargar la tienda básica (Lo más importante)
+      await cargarCategoriaMenu(); 
+      actualizarInterfaz();
+      
+      // 2. Intentar cargar sesión
+      if (usuarioActual) {
+        const { data } = await supabaseClient.from('usuarios').select('*').eq('username', usuarioActual).single();
+        if (data) {
+          currentUser = data;
+          if(currentUser.role === 'admin') actualizarContadorVisualAdmin();
+        } else {
+          localStorage.removeItem('usuarioActual'); usuarioActual = null;
+        }
       }
-    } else {
-      localStorage.removeItem('usuarioActual');
-      usuarioActual = null;
-    }
+
+      // 3. Ir a portada
+      await irASeccion('portada');
+
+      // 4. Intentar cargar extras (Visitas y Banners)
+      // Usamos .catch() para que si esto falla, NO ROMPA LA WEB
+      registrarVisita().catch(err => console.log("Aviso: No se pudo registrar visita", err));
+      cargarContenidoWeb().catch(err => console.log("Aviso: No se cargaron los banners (posible falta de tabla)", err));
+
+  } catch (errorGeneral) {
+      console.error("Hubo un error, pero la web sigue funcionando:", errorGeneral);
+  } finally {
+      // 5. ESTO SE EJECUTA SIEMPRE: QUITAR PANTALLA DE CARGA
+      setTimeout(() => {
+          const loader = document.getElementById('loader-overlay');
+          if(loader) { 
+              loader.style.opacity = '0'; 
+              setTimeout(() => loader.remove(), 500); 
+          }
+      }, 500);
   }
-  
-  // 4. Cargar Interfaz
-  await cargarCategoriaMenu(); 
-  actualizarInterfaz();
-  await irASeccion('portada');
-  
-  // 5. Quitar Loader
-  setTimeout(() => {
-      const loader = document.getElementById('loader-overlay');
-      if(loader) { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 500); }
-  }, 800);
 });
 
 function inicializarComponentesBootstrap() {
-  toastBootstrap = new bootstrap.Toast(document.getElementById('liveToast'));
+  const toastEl = document.getElementById('liveToast');
+  if(toastEl) toastBootstrap = new bootstrap.Toast(toastEl);
+  
   if(document.getElementById('modalCategoria')) modalCategoriaInst = new bootstrap.Modal(document.getElementById('modalCategoria'));
   if(document.getElementById('modalProducto')) modalProductoInst = new bootstrap.Modal(document.getElementById('modalProducto'));
   if(document.getElementById('modalDatosInvitado')) modalDatosInvitadoInst = new bootstrap.Modal(document.getElementById('modalDatosInvitado'), {backdrop: 'static', keyboard: false});
@@ -67,197 +74,121 @@ function inicializarComponentesBootstrap() {
   if(document.getElementById('modalProductoDetalle')) modalDetalleInst = new bootstrap.Modal(document.getElementById('modalProductoDetalle'));
 }
 
-// ================= LÓGICA DE VISITAS =================
+// ================= VISITAS =================
 async function registrarVisita() {
-    try {
-        await supabaseClient.from('visitas').insert({});
-    } catch (e) { console.error("Error registrando visita", e); }
+    await supabaseClient.from('visitas').insert({});
 }
 
 async function actualizarContadorVisualAdmin() {
     const container = document.getElementById('footerVisitasContainer');
     const label = document.getElementById('contador-visitas');
-    
     if(!container || !label) return;
 
-    container.classList.remove('d-none'); // Mostrar solo si admin
-
+    container.classList.remove('d-none'); // Mostrar solo si es admin
     try {
-        const hoy = new Date();
-        hoy.setHours(0, 0, 0, 0);
-        const hoyISO = hoy.toISOString();
-
-        const { count, error } = await supabaseClient
-            .from('visitas')
-            .select('*', { count: 'exact', head: true })
-            .gte('created_at', hoyISO);
-        
-        label.innerText = (error || count === null) ? "0" : count.toLocaleString();
-    } catch (e) {
-        label.innerText = "?";
-    }
+        const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+        const { count } = await supabaseClient.from('visitas').select('*', { count: 'exact', head: true }).gte('created_at', hoy.toISOString());
+        label.innerText = count ? count.toLocaleString() : "0";
+    } catch (e) { label.innerText = "-"; }
 }
 
-// ================= GESTIÓN DE CONTENIDO WEB (BANNERS Y CLIENTES) - NUEVO =================
+// ================= GESTIÓN DE CONTENIDO WEB (BANNERS Y CLIENTES) =================
 
-// 1. Mostrar Banners y Galería en la Portada
+// 1. Mostrar Banners y Galería
 async function cargarContenidoWeb() {
-    // Si no existe el elemento carrusel en el HTML, no hacemos nada
-    if (!document.getElementById('carouselPromos')) return;
+    const carouselContainer = document.getElementById('carouselPromos');
+    if (!carouselContainer) return;
 
-    try {
-        const { data, error } = await supabaseClient
-            .from('contenido_web')
-            .select('*')
-            .eq('activo', true)
-            .order('created_at', { ascending: false });
+    // Si la tabla no existe, esto dará error y se irá al .catch del inicio (no pasa nada)
+    const { data, error } = await supabaseClient
+        .from('contenido_web')
+        .select('*')
+        .eq('activo', true)
+        .order('created_at', { ascending: false });
 
-        if (error) throw error;
+    if (error) throw error; // Si hay error, salimos
 
-        const banners = data.filter(item => item.tipo === 'banner');
-        const clientes = data.filter(item => item.tipo === 'cliente');
+    const banners = data.filter(item => item.tipo === 'banner');
+    const clientes = data.filter(item => item.tipo === 'cliente');
 
-        // A. Renderizar Banners Carrusel
-        const carouselContainer = document.getElementById('carouselPromos');
-        const carouselInner = document.querySelector('#carouselPromos .carousel-inner');
-        const carouselIndicators = document.querySelector('#carouselPromos .carousel-indicators');
-        
-        if (banners.length > 0) {
-            carouselContainer.style.display = 'block'; // Mostrar carrusel
-            carouselInner.innerHTML = '';
-            carouselIndicators.innerHTML = '';
+    // Render Banners
+    const carouselInner = document.querySelector('#carouselPromos .carousel-inner');
+    const carouselIndicators = document.querySelector('#carouselPromos .carousel-indicators');
+    
+    if (banners.length > 0) {
+        carouselContainer.style.display = 'block';
+        carouselInner.innerHTML = ''; carouselIndicators.innerHTML = '';
+        banners.forEach((banner, index) => {
+            carouselIndicators.innerHTML += `<button type="button" data-bs-target="#carouselPromos" data-bs-slide-to="${index}" class="${index === 0 ? 'active' : ''}"></button>`;
+            carouselInner.innerHTML += `<div class="carousel-item ${index === 0 ? 'active' : ''}"><img src="${banner.imagen_url}" class="d-block w-100 banner-img" style="height: 300px; object-fit: cover; border-radius: 15px;" alt="Promo"><div class="carousel-caption d-none d-md-block" style="background: rgba(0,0,0,0.5); border-radius: 10px;"><h5>${banner.titulo || ''}</h5></div></div>`;
+        });
+    } else {
+        carouselContainer.style.display = 'none';
+    }
 
-            banners.forEach((banner, index) => {
-                // Indicadores (puntos)
-                carouselIndicators.innerHTML += `
-                    <button type="button" data-bs-target="#carouselPromos" data-bs-slide-to="${index}" 
-                        class="${index === 0 ? 'active' : ''}"></button>`;
-
-                // Slides
-                carouselInner.innerHTML += `
-                    <div class="carousel-item ${index === 0 ? 'active' : ''}">
-                        <img src="${banner.imagen_url}" class="d-block w-100 banner-img" alt="${banner.titulo || 'Promo'}">
-                        ${banner.titulo ? `
-                        <div class="carousel-caption d-none d-md-block">
-                            <h5>${banner.titulo}</h5>
-                        </div>` : ''}
-                    </div>`;
-            });
-        } else {
-            carouselContainer.style.display = 'none'; // Ocultar si no hay banners
-        }
-
-        // B. Renderizar Galería Clientes
-        const galeriaClientes = document.getElementById('galeriaClientesRow');
-        if (galeriaClientes && clientes.length > 0) {
-            galeriaClientes.innerHTML = '';
-            clientes.forEach(cliente => {
-                galeriaClientes.innerHTML += `
-                    <div class="col-3 col-md-2">
-                        <img src="${cliente.imagen_url}" class="img-fluid rounded shadow-sm cliente-foto" alt="Cliente Feliz" onclick="window.open('${cliente.imagen_url}')">
-                    </div>`;
-            });
-        }
-
-    } catch (error) {
-        console.error("Error cargando contenido web:", error);
+    // Render Clientes
+    const galeria = document.getElementById('galeriaClientesRow');
+    if (galeria && clientes.length > 0) {
+        galeria.innerHTML = '';
+        clientes.forEach(c => {
+            galeria.innerHTML += `<div class="col-3 col-md-2"><img src="${c.imagen_url}" class="img-fluid rounded shadow-sm cliente-foto" style="width:100%; aspect-ratio:1/1; object-fit:cover; border:2px solid white;" onclick="window.open('${c.imagen_url}')"></div>`;
+        });
     }
 }
 
-// 2. Subir Imagen (Función Admin)
+// 2. Subir Imagen (Admin)
 async function subirContenidoWeb() {
     const fileInput = document.getElementById('fileContenido');
     const tipo = document.getElementById('tipoContenido').value;
     const titulo = document.getElementById('tituloContenido').value;
     const file = fileInput.files[0];
 
-    if (!file) return alert("Por favor selecciona una imagen");
+    if (!file) return alert("Selecciona una imagen");
 
     try {
-        // Mostrar algún indicador de carga si lo deseas, o simplemente bloquear el botón
-        const btnSubir = document.querySelector('button[onclick="subirContenidoWeb()"]');
-        if(btnSubir) btnSubir.disabled = true; btnSubir.innerText = "Subiendo...";
+        const btn = document.querySelector('button[onclick="subirContenidoWeb()"]');
+        if(btn) { btn.disabled = true; btn.innerText = "Subiendo..."; }
 
-        // A. Subir al Storage (Bucket: contenido-web)
-        // Usamos Date.now() para nombre único y evitar duplicados
-        const nombreArchivo = `${Date.now()}_${file.name.replace(/\s/g, '')}`;
-        
-        const { data: dataStorage, error: errorStorage } = await supabaseClient
-            .storage
-            .from('contenido-web')
-            .upload(nombreArchivo, file);
+        // Subir Storage
+        const nombre = `${Date.now()}_${file.name.replace(/\s/g, '')}`;
+        const { error: errUpload } = await supabaseClient.storage.from('contenido-web').upload(nombre, file);
+        if (errUpload) throw errUpload;
 
-        if (errorStorage) throw errorStorage;
+        // Obtener URL
+        const { data: dataUrl } = supabaseClient.storage.from('contenido-web').getPublicUrl(nombre);
 
-        // B. Obtener URL Pública
-        const { data: dataUrl } = supabaseClient
-            .storage
-            .from('contenido-web')
-            .getPublicUrl(nombreArchivo);
+        // Guardar BD
+        const { error: errDB } = await supabaseClient.from('contenido_web').insert([{ tipo, imagen_url: dataUrl.publicUrl, titulo }]);
+        if (errDB) throw errDB;
 
-        const publicUrl = dataUrl.publicUrl;
-
-        // C. Guardar referencia en Base de Datos
-        const { error: errorDB } = await supabaseClient
-            .from('contenido_web')
-            .insert([{ tipo: tipo, imagen_url: publicUrl, titulo: titulo }]);
-
-        if (errorDB) throw errorDB;
-
-        mostrarToast("¡Imagen subida correctamente!");
-        fileInput.value = '';
-        document.getElementById('tituloContenido').value = '';
-        
-        // Refrescar lista admin y portada
-        await cargarContenidoAdmin();
-        await cargarContenidoWeb();
-
-    } catch (error) {
-        console.error("Error subiendo:", error);
-        alert("Error al subir: " + error.message);
+        mostrarToast("¡Imagen subida!");
+        fileInput.value = ''; document.getElementById('tituloContenido').value = '';
+        cargarContenidoAdmin(); cargarContenidoWeb();
+    } catch (e) {
+        alert("Error: " + e.message + "\n(Verifica que creaste el bucket 'contenido-web' y la tabla 'contenido_web')");
     } finally {
-        const btnSubir = document.querySelector('button[onclick="subirContenidoWeb()"]');
-        if(btnSubir) btnSubir.disabled = false; btnSubir.innerHTML = '<i class="bi bi-cloud-upload"></i> Subir Imagen';
+        const btn = document.querySelector('button[onclick="subirContenidoWeb()"]');
+        if(btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-cloud-upload"></i> Subir Imagen'; }
     }
 }
 
-// 3. Cargar lista para borrar (Función Admin)
+// 3. Admin lista fotos
 async function cargarContenidoAdmin() {
     const lista = document.getElementById('listaContenidoAdmin');
     if (!lista) return;
-
-    const { data } = await supabaseClient.from('contenido_web').select('*').eq('activo', true).order('created_at', { ascending: false });
-    
-    lista.innerHTML = '';
-    if(data.length === 0) lista.innerHTML = '<p class="text-muted small">No hay imágenes activas.</p>';
-
-    data.forEach(item => {
-        lista.innerHTML += `
-            <div class="col-4 col-md-2 position-relative">
-                <div class="border rounded p-1">
-                    <img src="${item.imagen_url}" class="img-fluid rounded" style="height:80px; width:100%; object-fit:cover;">
-                    <button onclick="eliminarContenido(${item.id})" class="btn btn-danger btn-sm position-absolute top-0 end-0 p-0 shadow" style="width:24px; height:24px; line-height:1; border-radius:50%; margin: -5px -5px 0 0;">&times;</button>
-                    <small class="d-block text-center mt-1 text-truncate" style="font-size:10px;">${item.tipo.toUpperCase()}</small>
-                </div>
-            </div>
-        `;
-    });
+    try {
+        const { data } = await supabaseClient.from('contenido_web').select('*').eq('activo', true).order('created_at', { ascending: false });
+        lista.innerHTML = '';
+        data.forEach(i => {
+            lista.innerHTML += `<div class="col-4 col-md-2 position-relative"><div class="border rounded p-1"><img src="${i.imagen_url}" class="img-fluid rounded" style="height:60px; width:100%; object-fit:cover;"><button onclick="eliminarContenido(${i.id})" class="btn btn-danger btn-sm position-absolute top-0 end-0 p-0" style="width:20px;height:20px;">&times;</button></div></div>`;
+        });
+    } catch(e) { console.log("Error cargando lista admin", e); }
 }
 
-// 4. Eliminar Imagen
 async function eliminarContenido(id) {
-    if(!confirm("¿Seguro que quieres borrar esta imagen?")) return;
-    
-    // Borramos de la tabla (no borramos del storage para evitar errores si la imagen se usa en otro lado, pero podrías hacerlo)
-    const { error } = await supabaseClient.from('contenido_web').delete().eq('id', id);
-    
-    if(!error) {
-        mostrarToast("Imagen eliminada.");
-        cargarContenidoAdmin();
-        cargarContenidoWeb();
-    } else {
-        mostrarToast("Error al eliminar.");
-    }
+    if(!confirm("¿Borrar?")) return;
+    await supabaseClient.from('contenido_web').delete().eq('id', id);
+    cargarContenidoAdmin(); cargarContenidoWeb();
 }
 
 // ================= NAVEGACIÓN =================
@@ -268,16 +199,17 @@ async function irASeccion(seccion) {
 
   if (seccion === 'portada') { 
       await cargarCategorias(); 
-      await cargarContenidoWeb(); // Asegurar que los banners se vean al volver
       limpiarBusqueda();
       document.querySelectorAll('.nav-link').forEach(btn => btn.classList.remove('active-cat'));
+      // Recargar contenido por si hubo cambios
+      cargarContenidoWeb().catch(e => {}); 
   }
   else if (seccion === 'carrito') { cargarCarrito(); } 
   else if (seccion === 'adminPanel') {
     if (currentUser?.role !== 'admin') { mostrarToast('🚫 Acceso denegado.'); irASeccion('portada'); return; }
     await cargarCategoriasAdmin();
     await cargarPedidosAdmin();
-    await cargarContenidoAdmin(); // Cargar gestión de fotos
+    cargarContenidoAdmin().catch(e => {});
     await actualizarBadgeColaAdmin();
   }
   
@@ -319,14 +251,14 @@ function cerrarSesion() {
   actualizarInterfaz(); irASeccion('portada');
 }
 
-// ================= TIENDA (CATEGORÍAS Y PRODUCTOS) =================
+// ================= TIENDA (CAT/PROD) =================
 async function cargarCategorias() {
   categorias = await loadCategories();
-  const c = document.getElementById('listaCategorias'); c.innerHTML = '';
-  if (categorias.length === 0) { c.innerHTML = '<div class="text-center py-5 text-muted">Cargando...</div>'; return; }
+  const c = document.getElementById('listaCategorias'); if(c) c.innerHTML = '';
+  if (categorias.length === 0 && c) { c.innerHTML = '<div class="text-center py-5 text-muted">Cargando...</div>'; return; }
 
   categorias.forEach(cat => {
-    c.innerHTML += `
+    if(c) c.innerHTML += `
       <div class="col-6 col-md-3 mb-3">
           <div class="card card-categoria h-100" onclick="verProductos('${cat.nombre}')">
               <div class="ratio-4x3"><img src="${cat.img}" alt="${cat.nombre}"></div>
@@ -344,10 +276,7 @@ async function cargarCategoriaMenu() {
   const m = document.getElementById('categoriaMenu'); if(!m) return;
   m.innerHTML = ''; 
   categorias.forEach(cat => {
-      m.innerHTML += `
-      <li class="nav-item">
-        <a class="nav-link text-white fw-bold" id="menu-btn-${cat.id}" href="#" onclick="verProductos('${cat.nombre}')">${cat.nombre}</a>
-      </li>`;
+      m.innerHTML += `<li class="nav-item"><a class="nav-link text-white fw-bold" id="menu-btn-${cat.id}" href="#" onclick="verProductos('${cat.nombre}')">${cat.nombre}</a></li>`;
   });
 }
 
@@ -415,17 +344,15 @@ function buscarProductos() {
   const cc = document.getElementById('contenedorCategorias');
   const cr = document.getElementById('contenedorResultados');
   const lr = document.getElementById('listaResultados');
-  const banners = document.getElementById('carouselPromos'); // Ocultar banner al buscar
+  const banners = document.getElementById('carouselPromos');
 
   if (q === '') { 
-      cc.classList.remove('d-none'); 
-      cr.classList.add('d-none'); 
-      if(banners) banners.style.display = 'block';
+      cc.classList.remove('d-none'); cr.classList.add('d-none'); 
+      if(banners) banners.style.display = 'block'; 
       return; 
   }
 
-  cc.classList.add('d-none'); 
-  cr.classList.remove('d-none'); 
+  cc.classList.add('d-none'); cr.classList.remove('d-none'); 
   if(banners) banners.style.display = 'none';
   
   lr.innerHTML = '';
@@ -807,13 +734,19 @@ async function marcarPedidoCompletado(id, idDeberiaSer) {
 }
 
 // ================= CRUD ADMIN (CAT/PROD) =================
+// Función GLOBAL de búsqueda
 window.filtrarProductosAdmin = function() {
     const query = document.getElementById('adminSearchInput').value.toLowerCase().trim();
     const tb = document.getElementById('tablaProductosAdmin');
     if(!tb) return;
     
     tb.innerHTML = '';
-    if(categorias.length === 0) { cargarProductosAdmin(); return; }
+    
+    // Si no hay categorías cargadas, cargar primero
+    if(categorias.length === 0) { 
+        cargarProductosAdmin(); 
+        return; 
+    }
 
     categorias.forEach(c => {
         c.productos.forEach(p => {
@@ -847,6 +780,28 @@ async function cargarProductosAdmin() {
   filtrarProductosAdmin();
 }
 
+// ================= DATA =================
+async function loadCategories() {
+  const { data: cats, error } = await supabaseClient.from('categorias').select('*');
+  if (error) return [];
+  for (let cat of cats) {
+    const { data: prods } = await supabaseClient.from('productos').select('*').eq('category_id', cat.id);
+    cat.productos = prods || [];
+  }
+  return cats;
+}
+
+async function loadPedidos() {
+  const { data } = await supabaseClient.from('pedidos').select('*').order('created_at', { ascending: true }); 
+  return data ? data.map(p => { 
+      const f = new Date(p.created_at);
+      p.fechaStr = f.toLocaleDateString('es-DO');
+      p.horaStr = f.toLocaleTimeString('es-DO', {hour: '2-digit', minute:'2-digit'});
+      return p; 
+  }) : [];
+}
+
+// CRUD
 function prepCat(id){ document.getElementById('catId').value=id||''; if(id){const c=categorias.find(x=>x.id==id);document.getElementById('catNombre').value=c.nombre;document.getElementById('catImg').value=c.img;}else{document.getElementById('catNombre').value='';document.getElementById('catImg').value='';}}
 async function guardarCategoria(){ const id=document.getElementById('catId').value,n=document.getElementById('catNombre').value,i=document.getElementById('catImg').value; if(!n)return; const {error}=id?await supabaseClient.from('categorias').update({nombre:n,img:i}).eq('id',id):await supabaseClient.from('categorias').insert({nombre:n,img:i}); if(!error){modalCategoriaInst.hide();cargarCategoriasAdmin();} }
 async function delCat(id){ if(confirm("¿Borrar?")) {await supabaseClient.from('categorias').delete().eq('id',id);cargarCategoriasAdmin();} }
@@ -854,3 +809,5 @@ async function delCat(id){ if(confirm("¿Borrar?")) {await supabaseClient.from('
 function prepProd(cid,pid){ const s=document.getElementById('prodCatId');s.innerHTML='';categorias.forEach(c=>s.innerHTML+=`<option value="${c.id}">${c.nombre}</option>`); document.getElementById('prodId').value=pid||''; if(pid){const p=categorias.find(c=>c.id==cid).productos.find(x=>x.id==pid);s.value=cid;document.getElementById('prodNombre').value=p.nombre;document.getElementById('prodPrecio').value=p.precio;document.getElementById('prodImg').value=p.img;document.getElementById('prodDesc').value=p.descripcion||'';document.getElementById('prodDisponible').checked=p.disponible;}else{document.getElementById('prodNombre').value='';document.getElementById('prodPrecio').value='';document.getElementById('prodImg').value='';document.getElementById('prodDesc').value='';}}
 async function guardarProducto(){ const id=document.getElementById('prodId').value,cid=document.getElementById('prodCatId').value,n=document.getElementById('prodNombre').value,p=document.getElementById('prodPrecio').value,i=document.getElementById('prodImg').value,d=document.getElementById('prodDesc').value,disp=document.getElementById('prodDisponible').checked; if(!n)return; const pay={category_id:cid,nombre:n,precio:p,img:i,descripcion:d,disponible:disp}; const {error}=id?await supabaseClient.from('productos').update(pay).eq('id',id):await supabaseClient.from('productos').insert(pay); if(!error){modalProductoInst.hide();cargarProductosAdmin();} }
 async function delProd(id){ if(confirm("¿Borrar?")) {await supabaseClient.from('productos').delete().eq('id',id);cargarProductosAdmin();} }
+
+function mostrarToast(msg) { document.getElementById('toastBody').innerText = msg; toastBootstrap.show(); }
