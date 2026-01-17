@@ -446,54 +446,174 @@ function generarLinkWhatsApp(p, turno) {
   return `https://wa.me/18096659100?text=${encodeURIComponent(msg)}`;
 }
 
-// ================= FACTURA PDF (LIMPIA) =================
+// ================= FACTURA PDF PROFESIONAL CON FOTOS =================
 function imprimirFactura(p, turno, win) {
     if (!win) return;
+
+    // 1. Generar filas de la tabla con IMAGEN
     let rows = '';
-    p.items.forEach(i => rows += `<tr><td style="padding:8px;border-bottom:1px solid #eee;">${i.nombre}</td><td style="text-align:center;border-bottom:1px solid #eee;">${i.cantidad}</td><td style="text-align:right;border-bottom:1px solid #eee;">${formatearRD(i.precio)}</td><td style="text-align:right;border-bottom:1px solid #eee;">${formatearRD(i.precio*i.cantidad)}</td></tr>`);
+    p.items.forEach(i => {
+        rows += `
+        <tr class="item-row">
+            <td style="text-align:center;">
+                <img src="${i.img}" alt="prod" style="width:50px; height:50px; object-fit:cover; border-radius:4px; border:1px solid #eee;">
+            </td>
+            <td style="vertical-align:middle; font-weight:500;">
+                ${i.nombre}
+                <div style="font-size:11px; color:#777;">Ref: ${i.nombre.substring(0,3).toUpperCase()}-${Math.floor(Math.random()*1000)}</div>
+            </td>
+            <td style="text-align:center; vertical-align:middle;">${i.cantidad}</td>
+            <td style="text-align:right; vertical-align:middle;">${formatearRD(i.precio)}</td>
+            <td style="text-align:right; vertical-align:middle; font-weight:bold;">${formatearRD(i.precio * i.cantidad)}</td>
+        </tr>`;
+    });
 
-    let bloqueTurno = (p.estado === 'pendiente' || !p.estado) 
-        ? `<div><strong>ORDEN #${p.id}</strong><br>TURNO ACTUAL: <span style="font-size:18px;font-weight:bold;">#${turno || '?'}</span></div>`
-        : `<div><strong>ORDEN #${p.id}</strong><br>ESTADO: ENTREGADO</div>`;
+    // 2. Definir estado y turno
+    let bloqueEstado = (p.estado === 'pendiente' || !p.estado) 
+        ? `<div class="status-box pending">
+             <span style="font-size:12px; text-transform:uppercase; letter-spacing:1px;">Turno de Entrega</span><br>
+             <span style="font-size:24px; font-weight:bold; color:#d32f2f;">#${turno || '?'}</span>
+           </div>`
+        : `<div class="status-box success">
+             <span style="font-size:16px; font-weight:bold; color:#2e7d32;">ENTREGADO</span>
+           </div>`;
 
-    // SIN FECHA DE IMPRESIÓN AL FINAL
+    // 3. Escribir el HTML Profesional
     win.document.open();
     win.document.write(`
-    <html><head><title>Cotización #${p.id}</title>
-    <style>
-      body { font-family: sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; color: #333; }
-      .header { text-align: center; border-bottom: 3px solid #6a1b9a; padding-bottom: 20px; margin-bottom: 20px; }
-      .logo { height: 80px; margin-bottom: 10px; }
-      .title { font-size: 24px; font-weight: bold; color: #6a1b9a; text-transform: uppercase; margin: 0; }
-      .desc { font-size: 12px; color: #666; font-style: italic; margin-top: 5px; }
-      .meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; border: 1px dashed #ddd; padding: 15px; border-radius: 10px; }
-      table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-      th { background: #6a1b9a; color: white; padding: 8px; text-align: left; }
-      .total { text-align: right; font-size: 20px; font-weight: bold; color: #6a1b9a; }
-      .footer { text-align: center; margin-top: 60px; font-size: 14px; color: #555; font-weight: bold; }
-      @media print { button { display: none; } }
-      .btn-bar { text-align:center; margin-bottom:15px; background:#f0f0f0; padding:10px; border-radius:8px; }
-      .btn { padding:10px 20px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; margin:0 5px; }
-      .btn-print { background:#6a1b9a; color:white; }
-      .btn-close { background:#ccc; color:#333; }
-    </style></head><body>
-      <div class="no-print btn-bar">
-          <button onclick="window.print()" class="btn btn-print">🖨️ Imprimir</button>
-          <button onclick="window.close()" class="btn btn-close">❌ Cerrar</button>
-      </div>
-      <div class="header">
-          <img src="Logo.PNG" class="logo" alt="Logo">
-          <h1 class="title">Mariposas Cuties</h1>
-          <p class="desc">Somos una empresa encargada de vender productos totalmente personalizados.</p>
-      </div>
-      <div class="meta">
-          <div><strong>CLIENTE:</strong><br>${p.cliente.nombre} ${p.cliente.apellido}<br>${p.cliente.telefono}</div>
-          <div style="text-align:right;">${bloqueTurno}<br><small>Fecha Pedido: ${p.fechaStr || 'Hoy'}</small></div>
-      </div>
-      <table><thead><tr><th>Producto</th><th style="text-align:center;">Cant.</th><th style="text-align:right;">Precio</th><th style="text-align:right;">Total</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="total">Total a Pagar: ${formatearRD(p.total)}</div>
-      <div class="footer">¡Gracias por preferirnos! ❤️</div>
-    </body></html>`);
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <title>Cotización #${p.id} - Mariposas Cuties</title>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
+            
+            body { font-family: 'Roboto', sans-serif; color: #333; margin: 0; padding: 40px; font-size: 14px; background: white; }
+            
+            /* Encabezado */
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #6a1b9a; padding-bottom: 20px; margin-bottom: 30px; }
+            .logo-area { display: flex; align-items: center; gap: 15px; }
+            .logo-area img { height: 70px; width: auto; }
+            .company-info { font-size: 12px; color: #555; text-align: right; }
+            .company-info h2 { margin: 0; color: #6a1b9a; font-size: 22px; text-transform: uppercase; }
+            
+            /* Info Cliente y Pedido */
+            .info-grid { display: flex; justify-content: space-between; margin-bottom: 40px; background: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px solid #eee; }
+            .client-info h3, .order-info h3 { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-top: 0; margin-bottom: 10px; }
+            .data { font-size: 15px; font-weight: 600; color: #000; line-height: 1.4; }
+            
+            /* Caja de Estado/Turno */
+            .status-box { text-align: center; border: 2px dashed #ccc; padding: 10px 20px; border-radius: 8px; background: #fff; min-width: 120px; }
+            
+            /* Tabla */
+            table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+            th { background-color: #6a1b9a; color: white; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; padding: 12px; text-align: left; }
+            td { padding: 12px; border-bottom: 1px solid #eee; }
+            .item-row:nth-child(even) { background-color: #fbfbfb; }
+            
+            /* Totales */
+            .total-section { display: flex; justify-content: flex-end; }
+            .total-box { width: 250px; }
+            .total-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+            .total-row.final { border-top: 2px solid #6a1b9a; border-bottom: none; font-size: 18px; font-weight: bold; color: #6a1b9a; margin-top: 10px; padding-top: 10px; }
+            
+            /* Footer */
+            .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #777; border-top: 1px solid #ddd; padding-top: 20px; }
+            
+            /* Botones (No salen en impresión) */
+            .no-print { text-align: center; margin-bottom: 20px; padding: 10px; background: #f0f0f0; border-radius: 8px; }
+            .btn { background: #6a1b9a; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin: 0 5px; }
+            .btn-close { background: #555; }
+            
+            @media print {
+                .no-print { display: none; }
+                body { padding: 0; }
+                /* Forza la impresión de colores de fondo (importante para la barra morada) */
+                -webkit-print-color-adjust: exact; 
+                print-color-adjust: exact;
+            }
+        </style>
+    </head>
+    <body>
+    
+        <div class="no-print">
+            <button onclick="window.print()" class="btn">🖨️ Imprimir / Guardar PDF</button>
+            <button onclick="window.close()" class="btn btn-close">Cerrar</button>
+        </div>
+
+        <div class="header">
+            <div class="logo-area">
+                <img src="Logo.PNG" alt="Logo">
+                <div>
+                    <h2 style="color:#6a1b9a; margin:0;">Mariposas Cuties</h2>
+                    <small>Detalles Personalizados</small>
+                </div>
+            </div>
+            <div class="company-info">
+                <h2>COTIZACIÓN</h2>
+                <p>Fecha: ${p.fechaStr || new Date().toLocaleDateString()}<br>
+                Hora: ${p.horaStr || new Date().toLocaleTimeString()}<br>
+                ID Orden: <strong>#${p.id}</strong></p>
+            </div>
+        </div>
+
+        <div class="info-grid">
+            <div class="client-info">
+                <h3>Facturar a:</h3>
+                <div class="data">${p.cliente.nombre} ${p.cliente.apellido}</div>
+                <div style="margin-top:5px;">📱 ${p.cliente.telefono}</div>
+            </div>
+            ${bloqueEstado}
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="text-align:center; width: 70px;">Imagen</th>
+                    <th>Descripción</th>
+                    <th style="text-align:center; width: 60px;">Cant.</th>
+                    <th style="text-align:right; width: 100px;">Precio</th>
+                    <th style="text-align:right; width: 110px;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rows}
+            </tbody>
+        </table>
+
+        <div class="total-section">
+            <div class="total-box">
+                <div class="total-row">
+                    <span>Subtotal:</span>
+                    <span>${formatearRD(p.total)}</span>
+                </div>
+                <div class="total-row">
+                    <span>ITBIS (0%):</span>
+                    <span>RD$ 0.00</span>
+                </div>
+                <div class="total-row final">
+                    <span>TOTAL:</span>
+                    <span>${formatearRD(p.total)}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>¡Gracias por tu preferencia! ❤️</strong></p>
+            <p>Para confirmar tu pedido, favor realizar el pago correspondiente.<br>
+            Contacto: (809) 665-9100 | Instagram: @mariposascuties</p>
+        </div>
+
+        <script>
+            // Intentar imprimir automáticamente cuando carguen las imágenes
+            window.onload = function() {
+                setTimeout(function() {
+                   // window.print(); // Descomenta si quieres que se abra solo
+                }, 500);
+            }
+        </script>
+    </body>
+    </html>`);
     win.document.close();
 }
 
@@ -656,4 +776,5 @@ async function delCat(id){ if(confirm("¿Borrar?")) {await supabaseClient.from('
 function prepProd(cid,pid){ const s=document.getElementById('prodCatId');s.innerHTML='';categorias.forEach(c=>s.innerHTML+=`<option value="${c.id}">${c.nombre}</option>`); document.getElementById('prodId').value=pid||''; if(pid){const p=categorias.find(c=>c.id==cid).productos.find(x=>x.id==pid);s.value=cid;document.getElementById('prodNombre').value=p.nombre;document.getElementById('prodPrecio').value=p.precio;document.getElementById('prodImg').value=p.img;document.getElementById('prodDesc').value=p.descripcion||'';document.getElementById('prodDisponible').checked=p.disponible;}else{document.getElementById('prodNombre').value='';document.getElementById('prodPrecio').value='';document.getElementById('prodImg').value='';document.getElementById('prodDesc').value='';}}
 async function guardarProducto(){ const id=document.getElementById('prodId').value,cid=document.getElementById('prodCatId').value,n=document.getElementById('prodNombre').value,p=document.getElementById('prodPrecio').value,i=document.getElementById('prodImg').value,d=document.getElementById('prodDesc').value,disp=document.getElementById('prodDisponible').checked; if(!n)return; const pay={category_id:cid,nombre:n,precio:p,img:i,descripcion:d,disponible:disp}; const {error}=id?await supabaseClient.from('productos').update(pay).eq('id',id):await supabaseClient.from('productos').insert(pay); if(!error){modalProductoInst.hide();cargarProductosAdmin();} }
 async function delProd(id){ if(confirm("¿Borrar?")) {await supabaseClient.from('productos').delete().eq('id',id);cargarProductosAdmin();} }
+
 
