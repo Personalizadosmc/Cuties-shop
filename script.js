@@ -785,7 +785,22 @@ function prepProd(cid,pid){ const s=document.getElementById('prodCatId');s.inner
 async function guardarProducto(){ const id=document.getElementById('prodId').value,cid=document.getElementById('prodCatId').value,n=document.getElementById('prodNombre').value,p=document.getElementById('prodPrecio').value,i=document.getElementById('prodImg').value,d=document.getElementById('prodDesc').value,disp=document.getElementById('prodDisponible').checked; if(!n)return; const pay={category_id:cid,nombre:n,precio:p,img:i,descripcion:d,disponible:disp}; const {error}=id?await supabaseClient.from('productos').update(pay).eq('id',id):await supabaseClient.from('productos').insert(pay); if(!error){modalProductoInst.hide();cargarProductosAdmin();} }
 async function delProd(id){ if(confirm("¿Borrar?")) {await supabaseClient.from('productos').delete().eq('id',id);cargarProductosAdmin();} }
 
-window.abrirModalProducto = openModalProd;
+// ================= MODALES (SOLUCIÓN ERROR) =================
+
+function abrirModalCategoria() {
+    prepCat(); // prepara el formulario
+    modalCategoriaInst.show(); // abre modal
+}
+
+function abrirModalProducto() {
+    prepProd(); // prepara el formulario
+    modalProductoInst.show(); // abre modal
+}
+
+// Compatibilidad con nombre viejo
+function openModalProd() {
+    abrirModalProducto();
+}
 
 
 
