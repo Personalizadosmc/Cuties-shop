@@ -157,12 +157,16 @@ function actualizarContadorCarrito() {
 function mostrarToast(msg) { document.getElementById('toastBody').innerText = msg; toastBootstrap.show(); }
 
 // ================= DATOS =================
-async function loadCategories() {
-  const { data: cats, error } = await supabaseClient.from('categorias').select('*');
+async function loadCategories({ soloVisibles = false } = {}) {
+  let query = supabaseClient.from('categorias').select('*');
+  if (soloVisibles) query = query.neq('visible', false); // filtra las ocultas
+  const { data: cats, error } = await query;
   if (error) return [];
   for (let cat of cats) {
     const { data: prods } = await supabaseClient.from('productos').select('*').eq('category_id', cat.id);
     cat.productos = prods || [];
+    // Si el campo aún no existe en la DB, lo tratamos como visible por defecto
+    if (cat.visible === undefined || cat.visible === null) cat.visible = true;
   }
   return cats;
 }
@@ -214,7 +218,7 @@ function cerrarSesion() {
 
 // ================= TIENDA =================
 async function cargarCategorias() {
-  categorias = await loadCategories();
+  categorias = await loadCategories({ soloVisibles: true });
   const c = document.getElementById('listaCategorias'); c.innerHTML = '';
   if (categorias.length === 0) { c.innerHTML = '<div class="text-center py-5 text-muted">Cargando...</div>'; return; }
 
@@ -764,12 +768,56 @@ window.filtrarProductosAdmin = function() {
 }
 
 async function cargarCategoriasAdmin() {
-  categorias = await loadCategories();
+  categorias = await loadCategories(); // Admin ve TODAS (visibles y ocultas)
   const tb = document.getElementById('tablaCategoriasAdmin'); if(!tb) return;
   tb.innerHTML = '';
   categorias.forEach(c => {
-    tb.innerHTML += `<tr><td class="align-middle"><img src="${c.img}" style="width:40px;height:40px;object-fit:cover;border-radius:5px;"></td><td class="align-middle fw-bold">${c.nombre}</td><td class="text-end"><button class="btn btn-sm btn-light border me-1" onclick="prepCat(${c.id})" data-bs-toggle="modal" data-bs-target="#modalCategoria"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-danger" onclick="delCat(${c.id})"><i class="bi bi-trash"></i></button></td></tr>`;
+    const esVisible = c.visible !== false;
+    const badgeEstado = esVisible
+      ? `<span class="badge bg-success-subtle text-success border border-success rounded-pill px-2"><i class="bi bi-eye-fill me-1"></i>Visible</span>`
+      : `<span class="badge bg-secondary-subtle text-secondary border border-secondary rounded-pill px-2"><i class="bi bi-eye-slash-fill me-1"></i>Oculta</span>`;
+    const btnToggle = esVisible
+      ? `<button class="btn btn-sm btn-outline-secondary rounded-pill me-1" title="Ocultar categoría" onclick="toggleVisibilidadCategoria(${c.id}, false)"><i class="bi bi-eye-slash"></i> Ocultar</button>`
+      : `<button class="btn btn-sm btn-outline-success rounded-pill me-1" title="Mostrar categoría" onclick="toggleVisibilidadCategoria(${c.id}, true)"><i class="bi bi-eye"></i> Mostrar</button>`;
+    const filaClass = esVisible ? '' : 'table-secondary opacity-75';
+    tb.innerHTML += `
+      <tr class="${filaClass}">
+        <td class="align-middle">
+          <img src="${c.img}" style="width:40px;height:40px;object-fit:cover;border-radius:5px;" class="${esVisible ? '' : 'opacity-50'}">
+        </td>
+        <td class="align-middle">
+          <div class="fw-bold">${c.nombre}</div>
+          <div class="mt-1">${badgeEstado}</div>
+        </td>
+        <td class="align-middle text-muted small text-center">${c.productos?.length || 0} productos</td>
+        <td class="text-end">
+          ${btnToggle}
+          <button class="btn btn-sm btn-light border me-1" onclick="prepCat(${c.id})" data-bs-toggle="modal" data-bs-target="#modalCategoria" title="Editar"><i class="bi bi-pencil"></i></button>
+          <button class="btn btn-sm btn-danger" onclick="delCat(${c.id})" title="Eliminar"><i class="bi bi-trash"></i></button>
+        </td>
+      </tr>`;
   });
+}
+
+async function toggleVisibilidadCategoria(id, nuevoEstado) {
+  const accion = nuevoEstado ? 'mostrar' : 'ocultar';
+  const emoji  = nuevoEstado ? '👁️' : '🙈';
+  if (!confirm(`${emoji} ¿Deseas ${accion} esta categoría y todos sus productos?`)) return;
+
+  const { error } = await supabaseClient
+    .from('categorias')
+    .update({ visible: nuevoEstado })
+    .eq('id', id);
+
+  if (error) {
+    mostrarToast('❌ Error al actualizar. Verifica que la columna "visible" exista en Supabase.');
+    console.error('Error toggle visibilidad:', error);
+    return;
+  }
+
+  mostrarToast(nuevoEstado ? '✅ Categoría habilitada y visible en la tienda.' : '🙈 Categoría ocultada. No aparece en la tienda.');
+  await cargarCategoriasAdmin();
+  await cargarCategoriaMenu();
 }
 
 async function cargarProductosAdmin() {
@@ -777,8 +825,8 @@ async function cargarProductosAdmin() {
   filtrarProductosAdmin();
 }
 
-function prepCat(id){ document.getElementById('catId').value=id||''; if(id){const c=categorias.find(x=>x.id==id);document.getElementById('catNombre').value=c.nombre;document.getElementById('catImg').value=c.img;}else{document.getElementById('catNombre').value='';document.getElementById('catImg').value='';}}
-async function guardarCategoria(){ const id=document.getElementById('catId').value,n=document.getElementById('catNombre').value,i=document.getElementById('catImg').value; if(!n)return; const {error}=id?await supabaseClient.from('categorias').update({nombre:n,img:i}).eq('id',id):await supabaseClient.from('categorias').insert({nombre:n,img:i}); if(!error){modalCategoriaInst.hide();cargarCategoriasAdmin();} }
+function prepCat(id){ document.getElementById('catId').value=id||''; if(id){const c=categorias.find(x=>x.id==id);document.getElementById('catNombre').value=c.nombre;document.getElementById('catImg').value=c.img; const chk=document.getElementById('catVisible'); if(chk) chk.checked=(c.visible!==false);}else{document.getElementById('catNombre').value='';document.getElementById('catImg').value=''; const chk=document.getElementById('catVisible'); if(chk) chk.checked=true;}}
+async function guardarCategoria(){ const id=document.getElementById('catId').value,n=document.getElementById('catNombre').value,i=document.getElementById('catImg').value; const chk=document.getElementById('catVisible'); const vis=chk?chk.checked:true; if(!n)return; const {error}=id?await supabaseClient.from('categorias').update({nombre:n,img:i,visible:vis}).eq('id',id):await supabaseClient.from('categorias').insert({nombre:n,img:i,visible:vis}); if(!error){modalCategoriaInst.hide();cargarCategoriasAdmin();mostrarToast('Categoría guardada.');} }
 async function delCat(id){ if(confirm("¿Borrar?")) {await supabaseClient.from('categorias').delete().eq('id',id);cargarCategoriasAdmin();} }
 
 function prepProd(cid,pid){ const s=document.getElementById('prodCatId');s.innerHTML='';categorias.forEach(c=>s.innerHTML+=`<option value="${c.id}">${c.nombre}</option>`); document.getElementById('prodId').value=pid||''; if(pid){const p=categorias.find(c=>c.id==cid).productos.find(x=>x.id==pid);s.value=cid;document.getElementById('prodNombre').value=p.nombre;document.getElementById('prodPrecio').value=p.precio;document.getElementById('prodImg').value=p.img;document.getElementById('prodDesc').value=p.descripcion||'';document.getElementById('prodDisponible').checked=p.disponible;}else{document.getElementById('prodNombre').value='';document.getElementById('prodPrecio').value='';document.getElementById('prodImg').value='';document.getElementById('prodDesc').value='';}}
